@@ -9,6 +9,7 @@ from typing import Sequence
 
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
 from wilco_as_reporting.discovery import discover_matches
+from wilco_as_reporting.parsers import MatchParseError, parse_match
 
 
 def build_fetch_parser() -> argparse.ArgumentParser:
@@ -47,6 +48,16 @@ def build_discover_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Replace existing raw discovery snapshots.",
     )
+    return parser
+
+
+def build_parse_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli parse",
+        description="Parse raw SASP match snapshots into base CSV tables.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
     return parser
 
 
@@ -105,6 +116,27 @@ def run_discover(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_parse(arguments: Sequence[str]) -> int:
+    args = build_parse_parser().parse_args(arguments)
+    try:
+        result = parse_match(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+        )
+    except MatchParseError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    print(f"match score rows: {result.match_score_rows}")
+    print(f"ranking rows: {result.ranking_rows}")
+    print(f"squad result rows: {result.squad_result_rows}")
+    print(f"stage score rows: {result.stage_score_rows}")
+    for warning in result.warnings:
+        print(f"Warning: {warning}")
+    print(f"tables directory: {result.match_scores_path.parent}")
+    return 0
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     command_arguments = list(
         sys.argv[1:] if arguments is None else arguments
@@ -113,6 +145,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_discover(command_arguments[1:])
     if command_arguments and command_arguments[0] == "fetch":
         return run_fetch(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "parse":
+        return run_parse(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
