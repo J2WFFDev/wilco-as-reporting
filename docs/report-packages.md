@@ -1,5 +1,22 @@
 # Report Packages
 
+## Award and ranking scope rules
+
+For large matches such as Nationals:
+
+- Individual High Overall / HOA awards are determined by Class, not Division.
+- Squad rankings are always Divisional.
+- Overall discipline boards may rank all competitors together and are useful for comparison, but they should not be confused with the Class-based HOA award structure.
+
+Report logic must keep these scopes separate:
+
+| Result Type | Correct Award Scope |
+|---|---|
+| Individual HOA / High Overall | Class |
+| Individual gender HOA, when present | Class plus gender context |
+| Squad rankings | Division |
+| Overall discipline comparison | All competitors in discipline |
+
 ## Package 1: Wilco Match Operations Package
 
 Customer: Wilco Shooting Sports.
@@ -79,9 +96,11 @@ Highlight rules:
 
 Collapse duplicate leaderboard rows into one story-quality row by athlete, discipline, and score.
 
-Do not generate redundant lines when an athlete appears in Overall, Gender, and Division leaderboards for the same performance.
+Do not generate redundant lines when an athlete appears in Overall, Gender, and Class-based HOA leaderboards for the same performance.
 
 A second-place finish in a TOP 1 board is runner-up or close to win, not a near award miss.
+
+For Nationals-style matches, individual award highlights should use Class-based HOA language. Squad highlights should use Divisional language.
 
 ## Package 3: SASP Match Validation and Score Audit
 
