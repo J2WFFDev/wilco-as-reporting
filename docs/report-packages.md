@@ -141,6 +141,52 @@ artifact set. Match `664` is the completed validation case. Match `671` is the
 Nationals readiness/live case and may produce partial award tables until
 scoring is complete.
 
+### Nationals operations package
+
+The Nationals operations layer runs after the full and team builds:
+
+```powershell
+python -m wilco_as_reporting.cli build-nationals --match-id 671 --output-dir output/671 --team-key wilco --include-schedule --overwrite --snapshot-label morning
+```
+
+It preserves the current build, finds the latest prior snapshot for the same
+match and team, and writes:
+
+- `wilco_change_summary.csv`
+- `wilco_athlete_changes.csv`
+- `wilco_award_changes.csv`
+- `wilco_squad_changes.csv`
+- `wilco_stage_changes.csv`
+- `wilco_review_changes.csv`
+- `wilco_daily_brief.csv`
+
+These files live in
+`output/<match_id>/nationals_ops/<team_key>/`. The daily brief turns data
+status, changed results, review items, validation findings, and recommended
+next actions into short coach-readable items.
+
+The operations workbook is:
+
+```text
+output/<match_id>/workbooks/match_<match_id>_<team_key>_nationals_ops.xlsx
+```
+
+Its tabs are Cover, Daily Brief, Change Summary, Athlete Changes, Award
+Changes, Squad Changes, Stage Changes, Review Changes, and Current Wilco
+Summary.
+
+The first compatible run is a baseline. Later runs compare with the latest
+snapshot. Partial Match `671` data remains a valid operational artifact:
+missing scores or rankings are reported as limitations rather than treated as
+a pipeline crash.
+
+The manual **Build Nationals Ops Report** workflow uploads
+`nationals-<match_id>-<team_key>-ops` with 14-day retention. The artifact
+contains the current raw, parsed, validation, report, team, workbook,
+snapshot, operations, and manifest outputs. Scheduled automation is not part
+of this phase. A match-and-team-scoped Actions cache carries only snapshots
+and manifest state forward so a later manual run can locate its predecessor.
+
 Athlete Stage Matrix columns:
 
 - Athlete Name

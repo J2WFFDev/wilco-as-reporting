@@ -13,7 +13,8 @@ wilco-as-reporting/
 │       ├── discover-matches.yml
 │       ├── refresh-match.yml
 │       ├── build-match-report.yml
-│       └── build-team-match-report.yml
+│       ├── build-team-match-report.yml
+│       └── build-nationals-ops.yml
 │
 ├── config/
 │   ├── match_overrides.csv
@@ -36,6 +37,7 @@ wilco-as-reporting/
 │       ├── cli.py
 │       ├── discovery.py
 │       ├── pipeline.py
+│       ├── nationals_ops.py
 │       ├── team_profiles.py
 │       ├── api/
 │       │   ├── __init__.py
@@ -57,7 +59,8 @@ wilco-as-reporting/
 │       └── workbooks/
 │           ├── __init__.py
 │           ├── excel_writer.py
-│           └── team_excel_writer.py
+│           ├── team_excel_writer.py
+│           └── nationals_excel_writer.py
 │
 ├── data/
 │   ├── raw/
@@ -111,6 +114,12 @@ Create Excel workbooks from validated tables.
 Run the fetch, parse, validate, report-table, and workbook steps in order for
 one match.
 
+### `nationals_ops.py`
+
+Preserve timestamped team-build snapshots, append the runtime refresh
+manifest, compare the current team state with the previous snapshot, and
+build the Nationals change tables and daily brief.
+
 ### `team_profiles.py`
 
 Load tracked team identity, aliases, and activation metadata used by
@@ -144,6 +153,7 @@ python -m wilco_as_reporting.cli build --match-id 664 --output-dir output/664 --
 python -m wilco_as_reporting.cli team-report --match-id 664 --output-dir output/664 --team-key wilco
 python -m wilco_as_reporting.cli team-workbook --match-id 664 --output-dir output/664 --team-key wilco
 python -m wilco_as_reporting.cli build-team --match-id 664 --output-dir output/664 --team-key wilco --include-schedule
+python -m wilco_as_reporting.cli build-nationals --match-id 671 --output-dir output/671 --team-key wilco --include-schedule --overwrite --snapshot-label manual
 ```
 
 ## Data flow
@@ -154,7 +164,9 @@ SASP API
   -> normalized tables
   -> validation tables
   -> report tables
-  -> workbook / CSV outputs
+  -> team workbook / CSV outputs
+  -> timestamped snapshot
+  -> change tables / daily brief / Nationals operations workbook
 ```
 
 ## Design rule

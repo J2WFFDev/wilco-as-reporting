@@ -9,8 +9,10 @@ from typing import Sequence
 
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
 from wilco_as_reporting.discovery import discover_matches
+from wilco_as_reporting.nationals_ops import NationalsOpsError
 from wilco_as_reporting.parsers import MatchParseError, parse_match
 from wilco_as_reporting.pipeline import (
+    build_nationals_match,
     build_single_match,
     build_team_match,
 )
@@ -30,6 +32,7 @@ from wilco_as_reporting.validators import (
 )
 from wilco_as_reporting.workbooks import (
     MatchWorkbookError,
+    NationalsWorkbookError,
     TeamWorkbookError,
     build_match_workbook,
     build_team_workbook,
@@ -169,6 +172,34 @@ def build_team_pipeline_parser() -> argparse.ArgumentParser:
         "--overwrite",
         action="store_true",
         help="Replace existing raw snapshot files.",
+    )
+    parser.add_argument(
+        "--include-schedule",
+        action="store_true",
+        help="Fetch and save the match schedule snapshot.",
+    )
+    return parser
+
+
+def build_nationals_pipeline_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli build-nationals",
+        description=(
+            "Refresh, snapshot, compare, and brief a monitored match."
+        ),
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--team-key", required=True)
+    parser.add_argument(
+        "--snapshot-label",
+        default="manual",
+        help="Short snapshot label such as morning, evening, or final.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace current raw snapshot files before preserving a copy.",
     )
     parser.add_argument(
         "--include-schedule",
@@ -468,6 +499,66 @@ def run_build_team(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_build_nationals(arguments: Sequence[str]) -> int:
+    args = build_nationals_pipeline_parser().parse_args(arguments)
+    try:
+        profile = load_team_profile(args.team_key)
+        result = build_nationals_match(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+            profile=profile,
+            snapshot_label=args.snapshot_label,
+            overwrite=args.overwrite,
+            include_schedule=args.include_schedule,
+        )
+    except (
+        SaspApiError,
+        MatchParseError,
+        MatchValidationError,
+        MatchReportError,
+        MatchWorkbookError,
+        TeamProfileError,
+        TeamReportError,
+        TeamWorkbookError,
+        NationalsOpsError,
+        NationalsWorkbookError,
+    ) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    operations = result.operations_result
+    print(f"match_id: {args.match_id}")
+    print(f"team_key: {profile.team_key}")
+    print(f"snapshot path: {operations.snapshot_path}")
+    print(
+        "previous snapshot: "
+        + (
+            str(operations.previous_snapshot_path)
+            if operations.previous_snapshot_path
+            else "BASELINE"
+        )
+    )
+    print(f"comparison status: {operations.comparison_status}")
+    print(f"data status: {operations.data_status}")
+    print("validation findings:")
+    for severity in ("ERROR", "WARNING", "REVIEW"):
+        print(
+            f"  {severity}: "
+            f"{operations.validation_counts.get(severity, 0)}"
+        )
+    print(
+        f"changed athlete count: "
+        f"{operations.changed_athlete_count}"
+    )
+    print(f"changed award count: {operations.changed_award_count}")
+    print(f"changed squad count: {operations.changed_squad_count}")
+    print(f"new review count: {operations.new_review_count}")
+    print(f"operations workbook: {operations.workbook_path}")
+    for note in operations.notes:
+        print(f"operations note: {note}")
+    return 0
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     command_arguments = list(
         sys.argv[1:] if arguments is None else arguments
@@ -492,6 +583,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_team_workbook(command_arguments[1:])
     if command_arguments and command_arguments[0] == "build-team":
         return run_build_team(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "build-nationals":
+        return run_build_nationals(command_arguments[1:])
     return run_fetch(command_arguments)
 
 

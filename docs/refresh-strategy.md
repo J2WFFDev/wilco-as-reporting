@@ -59,29 +59,32 @@ the refresh manifest.
 
 ## Refresh Manifest
 
-The recommended runtime manifest is:
+The implemented runtime manifest is:
 
 ```text
 output/state/match_refresh_manifest.csv
 ```
 
-Suggested columns:
+Current columns:
 
 | Column | Purpose |
 | --- | --- |
 | `match_id` | SASP match identifier |
+| `team_key` | Team profile used for the operational run |
 | `match_name` | Current match name |
-| `post_raw` | Raw SASP match classification, preserved as received |
-| `start_date` | Match start date |
-| `end_date` | Match end date |
-| `last_checked_at` | Most recent refresh attempt |
-| `last_changed_at` | Most recent detected source change |
-| `slots_hash` | Hash of the current slots JSON |
-| `leaderboard_hash` | Hash of the current leaderboard JSON |
-| `schedule_hash` | Hash of the current schedule JSON, when fetched |
-| `slots_row_count` | Number of slot records in the current snapshot |
-| `leaderboard_generated` | Source-generated leaderboard timestamp |
-| `status` | Refresh or match-state summary |
+| `run_timestamp` | Local time when the build ran |
+| `snapshot_label` | Operator label such as morning or final |
+| `snapshot_path` | Preserved artifact path |
+| `raw_slots_hash` | SHA-256 hash of slots JSON |
+| `raw_leaderboard_hash` | SHA-256 hash of leaderboard JSON |
+| `raw_schedule_hash` | SHA-256 hash of schedule JSON, when available |
+| `team_report_hash` | Combined hash of current team report tables |
+| `workbook_hash` | Hash of the current team workbook |
+| `athlete_count` | Team athletes in the current build |
+| `entry_count` | Team discipline entries in the current build |
+| `stage_row_count` | Team stage rows in the current build |
+| `validation_*_count` | Team ERROR, WARNING, and REVIEW counts |
+| `data_status` | `complete`, `partial`, `no_scores`, or other state |
 | `notes` | Operator or processing notes |
 
 The manifest should be generated state under `output/`; it should not be
@@ -104,14 +107,14 @@ is implemented.
 
 ## Change Detection
 
-For each fetched source:
+For each operational build:
 
 1. Compute a stable hash of the slots, leaderboard, and optional schedule
    JSON.
 2. Compare each hash with the previous manifest entry.
-3. If all fetched hashes are unchanged, update `last_checked_at` only.
-4. If any hash changed, update `last_checked_at` and `last_changed_at`, store
-   the new hashes and metadata, and produce refreshed downstream artifacts.
+3. Append the current hashes and artifact metadata to the runtime manifest.
+4. Preserve the full current build in a timestamped snapshot so a later run
+   can compare report tables safely without losing the prior state.
 
 Hash comparison should use the saved raw snapshot content. The source JSON
 must remain unmodified.
@@ -121,19 +124,42 @@ must remain unmodified.
 Match `671`, the 2026 SASP National Championships, is the primary watched
 event.
 
+Run the operational refresh with:
+
+```powershell
+python -m wilco_as_reporting.cli build-nationals --match-id 671 --output-dir output/671 --team-key wilco --include-schedule --overwrite --snapshot-label manual
+```
+
 During Nationals:
 
 - refresh slots and leaderboard repeatedly;
 - include schedule data as match metadata by default;
 - use high refresh priority;
 - update the manifest after each check; and
-- later preserve timestamped raw snapshots during event days so changes can
-  be audited over time.
+- preserve timestamped full-build snapshots during event days so changes can
+  be audited over time;
+- compare the current Wilco results with the latest compatible snapshot; and
+- publish a coach-readable daily brief and operations workbook.
 
 The `build-team` command can be run repeatedly for Match `671` to refresh the
 full-match and Wilco coaching artifacts. Before leaderboard scoring is
 complete, award and comparison tables may be empty while registration,
 squads, stage readiness, and validation-review content remain available.
 
-Timestamped event-day snapshots are a future capability. The current refresh
-workflow replaces the current raw snapshot when overwrite is enabled.
+Snapshot folders use:
+
+```text
+output/<match_id>/snapshots/<YYYYMMDD_HHMMSS>_<team_key>_<label>/
+```
+
+The first run is marked `BASELINE`. Later runs are marked `COMPARED` when the
+prior snapshot is compatible. Missing or incompatible prior files produce
+`UNAVAILABLE` without crashing. Missing schedule data, incomplete scores, or
+temporarily absent rankings also do not fail Match `671`; they are described
+in Data Status and Next Actions brief items.
+
+The **Build Nationals Ops Report** workflow supports manual event-day runs.
+It restores only the selected match/team snapshot folder and runtime manifest
+from an Actions cache, then stores the new state for the next manual run. The
+full generated package is still uploaded as a normal downloadable artifact.
+No scheduled refresh automation is implemented yet.

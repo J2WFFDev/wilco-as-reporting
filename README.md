@@ -103,3 +103,28 @@ queue.
 The manual GitHub Actions workflow **Build Team Match Report** uploads
 `match-<match_id>-<team_key>-report`. Match `664` is the completed validation
 match; Match `671` is the Nationals readiness and live-monitoring target.
+
+## Nationals operations
+
+Refresh Match `671`, preserve a timestamped Wilco snapshot, compare it with
+the prior snapshot, and create the daily operations brief with:
+
+```powershell
+python -m wilco_as_reporting.cli build-nationals --match-id 671 --output-dir output/671 --team-key wilco --include-schedule --overwrite --snapshot-label manual
+```
+
+Snapshots are stored under
+`output/<match_id>/snapshots/<YYYYMMDD_HHMMSS>_<team_key>_<label>/`.
+Runtime refresh history is appended to
+`output/state/match_refresh_manifest.csv`. The current comparison tables and
+daily brief are written under
+`output/<match_id>/nationals_ops/<team_key>/`, and the coach workbook is
+`output/<match_id>/workbooks/match_<match_id>_<team_key>_nationals_ops.xlsx`.
+
+The manual **Build Nationals Ops Report** workflow uploads
+`nationals-<match_id>-<team_key>-ops` with the complete current build,
+timestamped snapshot, operations tables, workbook, and manifest. Partial live
+Nationals data is reported clearly and does not fail the build. The workflow
+restores the latest snapshot/manifest state from a match-and-team-scoped
+Actions cache so separate manual runs can compare safely. Scheduled automation
+is intentionally not included yet.

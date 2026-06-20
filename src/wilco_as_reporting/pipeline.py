@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from wilco_as_reporting.api.sasp_client import MatchSnapshots, SaspClient
+from wilco_as_reporting.nationals_ops import (
+    NationalsOpsResult,
+    build_nationals_operations,
+)
 from wilco_as_reporting.parsers import ParseResult, parse_match
 from wilco_as_reporting.reports import (
     ReportResult,
@@ -37,6 +41,12 @@ class TeamBuildResult:
     full_build: BuildResult
     team_report_result: TeamReportResult
     team_workbook_result: TeamWorkbookResult
+
+
+@dataclass(frozen=True)
+class NationalsBuildResult:
+    team_build: TeamBuildResult
+    operations_result: NationalsOpsResult
 
 
 def build_single_match(
@@ -111,4 +121,35 @@ def build_team_match(
         full_build=full_build,
         team_report_result=team_report_result,
         team_workbook_result=team_workbook_result,
+    )
+
+
+def build_nationals_match(
+    match_id: int,
+    output_dir: Path | str,
+    profile: TeamProfile,
+    *,
+    snapshot_label: str = "manual",
+    overwrite: bool = False,
+    include_schedule: bool = False,
+    client: SaspClient | None = None,
+) -> NationalsBuildResult:
+    """Build current team artifacts and a preserved operations snapshot."""
+    team_build = build_team_match(
+        match_id=match_id,
+        output_dir=output_dir,
+        profile=profile,
+        overwrite=overwrite,
+        include_schedule=include_schedule,
+        client=client,
+    )
+    operations_result = build_nationals_operations(
+        match_id=match_id,
+        output_dir=output_dir,
+        profile=profile,
+        snapshot_label=snapshot_label,
+    )
+    return NationalsBuildResult(
+        team_build=team_build,
+        operations_result=operations_result,
     )
