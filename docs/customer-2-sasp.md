@@ -98,6 +98,60 @@ Generic SASP reporting should expose rank type and award scope explicitly so rep
 - Athletes
 - Individual scores
 
+## Suggested Customer 2 workbooks
+
+These workbook concepts are generic SASP-facing deliverables and should not include Wilco-specific coaching or team-development assumptions.
+
+### SASP Match Integrity Workbook
+
+Purpose: validate match quality before results are finalized.
+
+Suggested tab order:
+
+1. Dashboard
+2. Score Audit Summary
+3. Math Validation
+4. Completeness Checks
+5. String Anomalies
+6. DQ / DNF Review
+7. Squad Validation
+8. Hardcopy Reconciliation
+9. Warnings
+10. Exception Log
+
+### SASP Match Results Workbook
+
+Purpose: produce neutral match result summaries.
+
+Suggested tab order:
+
+1. Match Summary
+2. Participation Statistics
+3. Athlete Results
+4. Squad Results
+5. Awards
+6. Close Finishes
+7. Match Records
+8. Notes
+
+### SASP Historical Analytics Workbook
+
+Purpose: understand trends across years, matches, disciplines, cohorts, and participation levels.
+
+Suggested tab order:
+
+1. Dashboard
+2. Participation Trends
+3. Winner Thresholds
+4. Award Thresholds
+5. Field Medians
+6. Compression Metrics
+7. Difficulty Index
+8. Improvement Velocity
+9. Stage Difficulty
+10. Discipline Trends
+11. Year-over-Year Comparisons
+
 ## Generic SASP historical analytics
 
 Historical analytics should use award-scope and field-size-aware benchmarks instead of fixed Top 1 / Top 3 / Top 5 / Top 10 cohorts.
