@@ -24,6 +24,7 @@ data/processed/
 *.zip
 !config/match_overrides.csv
 !config/watched_matches.csv
+!config/team_profiles.csv
 
 # OS / editors
 .DS_Store

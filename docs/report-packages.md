@@ -116,6 +116,31 @@ Stage Coach View columns:
 
 Use four counting strings for official stage metrics.
 
+The implemented Wilco team package uses the `wilco` profile from
+`config/team_profiles.csv`:
+
+```powershell
+python -m wilco_as_reporting.cli team-report --match-id 664 --output-dir output/664 --team-key wilco
+python -m wilco_as_reporting.cli team-workbook --match-id 664 --output-dir output/664 --team-key wilco
+python -m wilco_as_reporting.cli build-team --match-id 664 --output-dir output/664 --team-key wilco --include-schedule
+```
+
+Team report tables are written under
+`output/<match_id>/team_report_tables/<team_key>/`. The team workbook is
+written to
+`output/<match_id>/workbooks/match_<match_id>_<team_key>_report.xlsx`.
+
+The full-match package answers what happened across the event. The Wilco
+package answers what the coaching staff needs to know: team participation,
+athlete results, official awards, comparison context, squad outcomes, stage
+review cues, and team-specific validation findings.
+
+The **Build Team Match Report** workflow uploads
+`match-<match_id>-<team_key>-report` with the complete full-match and team
+artifact set. Match `664` is the completed validation case. Match `671` is the
+Nationals readiness/live case and may produce partial award tables until
+scoring is complete.
+
 Athlete Stage Matrix columns:
 
 - Athlete Name

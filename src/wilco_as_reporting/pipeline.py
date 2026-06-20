@@ -7,9 +7,20 @@ from pathlib import Path
 
 from wilco_as_reporting.api.sasp_client import MatchSnapshots, SaspClient
 from wilco_as_reporting.parsers import ParseResult, parse_match
-from wilco_as_reporting.reports import ReportResult, build_match_report
+from wilco_as_reporting.reports import (
+    ReportResult,
+    TeamReportResult,
+    build_match_report,
+    build_team_report,
+)
+from wilco_as_reporting.team_profiles import TeamProfile
 from wilco_as_reporting.validators import ValidationResult, validate_match
-from wilco_as_reporting.workbooks import WorkbookResult, build_match_workbook
+from wilco_as_reporting.workbooks import (
+    TeamWorkbookResult,
+    WorkbookResult,
+    build_match_workbook,
+    build_team_workbook,
+)
 
 
 @dataclass(frozen=True)
@@ -19,6 +30,13 @@ class BuildResult:
     validation_result: ValidationResult
     report_result: ReportResult
     workbook_result: WorkbookResult
+
+
+@dataclass(frozen=True)
+class TeamBuildResult:
+    full_build: BuildResult
+    team_report_result: TeamReportResult
+    team_workbook_result: TeamWorkbookResult
 
 
 def build_single_match(
@@ -61,3 +79,36 @@ def build_single_match(
         workbook_result=workbook_result,
     )
 
+
+def build_team_match(
+    match_id: int,
+    output_dir: Path | str,
+    profile: TeamProfile,
+    *,
+    overwrite: bool = False,
+    include_schedule: bool = False,
+    client: SaspClient | None = None,
+) -> TeamBuildResult:
+    """Build full-match and team coaching artifacts."""
+    full_build = build_single_match(
+        match_id=match_id,
+        output_dir=output_dir,
+        overwrite=overwrite,
+        include_schedule=include_schedule,
+        client=client,
+    )
+    team_report_result = build_team_report(
+        match_id=match_id,
+        output_dir=output_dir,
+        profile=profile,
+    )
+    team_workbook_result = build_team_workbook(
+        match_id=match_id,
+        output_dir=output_dir,
+        profile=profile,
+    )
+    return TeamBuildResult(
+        full_build=full_build,
+        team_report_result=team_report_result,
+        team_workbook_result=team_workbook_result,
+    )

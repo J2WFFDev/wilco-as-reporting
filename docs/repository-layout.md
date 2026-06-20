@@ -12,11 +12,13 @@ wilco-as-reporting/
 │       ├── fetch-match.yml
 │       ├── discover-matches.yml
 │       ├── refresh-match.yml
-│       └── build-match-report.yml
+│       ├── build-match-report.yml
+│       └── build-team-match-report.yml
 │
 ├── config/
 │   ├── match_overrides.csv
-│   └── watched_matches.csv
+│   ├── watched_matches.csv
+│   └── team_profiles.csv
 │
 ├── docs/
 │   ├── customer-1-wilco.md
@@ -34,6 +36,7 @@ wilco-as-reporting/
 │       ├── cli.py
 │       ├── discovery.py
 │       ├── pipeline.py
+│       ├── team_profiles.py
 │       ├── api/
 │       │   ├── __init__.py
 │       │   └── sasp_client.py
@@ -46,13 +49,15 @@ wilco-as-reporting/
 │       │   └── score_validator.py
 │       ├── reports/
 │       │   ├── __init__.py
-│       │   └── match_report.py
+│       │   ├── match_report.py
+│       │   └── team_report.py
 │       ├── analytics/
 │       │   ├── __init__.py
 │       │   └── historical_metrics.py
 │       └── workbooks/
 │           ├── __init__.py
-│           └── excel_writer.py
+│           ├── excel_writer.py
+│           └── team_excel_writer.py
 │
 ├── data/
 │   ├── raw/
@@ -106,6 +111,11 @@ Create Excel workbooks from validated tables.
 Run the fetch, parse, validate, report-table, and workbook steps in order for
 one match.
 
+### `team_profiles.py`
+
+Load tracked team identity, aliases, and activation metadata used by
+team-focused reports.
+
 ### `cli.py`
 
 Command-line entry point for running the pipeline.
@@ -131,6 +141,9 @@ python -m wilco_as_reporting.cli validate --match-id 664 --output-dir output/664
 python -m wilco_as_reporting.cli report --match-id 664 --output-dir output/664
 python -m wilco_as_reporting.cli workbook --match-id 664 --output-dir output/664
 python -m wilco_as_reporting.cli build --match-id 664 --output-dir output/664 --include-schedule
+python -m wilco_as_reporting.cli team-report --match-id 664 --output-dir output/664 --team-key wilco
+python -m wilco_as_reporting.cli team-workbook --match-id 664 --output-dir output/664 --team-key wilco
+python -m wilco_as_reporting.cli build-team --match-id 664 --output-dir output/664 --team-key wilco --include-schedule
 ```
 
 ## Data flow

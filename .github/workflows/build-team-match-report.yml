@@ -1,0 +1,77 @@
+name: Build Team Match Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      match_id:
+        description: SASP match ID to build
+        required: true
+        default: "664"
+        type: string
+      team_key:
+        description: Configured team profile key
+        required: true
+        default: "wilco"
+        type: string
+      overwrite:
+        description: Overwrite existing raw snapshot files
+        required: true
+        default: true
+        type: boolean
+      include_schedule:
+        description: Fetch the match schedule snapshot
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build-team-match-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build team match report
+        env:
+          MATCH_ID: ${{ inputs.match_id }}
+          TEAM_KEY: ${{ inputs.team_key }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          INCLUDE_SCHEDULE: ${{ inputs.include_schedule }}
+          PYTHONPATH: src
+        run: |
+          overwrite_arg=""
+          schedule_arg=""
+
+          if [[ "$OVERWRITE" == "true" ]]; then
+            overwrite_arg="--overwrite"
+          fi
+          if [[ "$INCLUDE_SCHEDULE" == "true" ]]; then
+            schedule_arg="--include-schedule"
+          fi
+
+          python -m wilco_as_reporting.cli build-team \
+            --match-id "$MATCH_ID" \
+            --output-dir "output/$MATCH_ID" \
+            --team-key "$TEAM_KEY" \
+            $overwrite_arg \
+            $schedule_arg
+
+      - name: Upload team match report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-${{ inputs.match_id }}-${{ inputs.team_key }}-report
+          path: output/${{ inputs.match_id }}
+          retention-days: 14

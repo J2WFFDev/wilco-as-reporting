@@ -83,3 +83,23 @@ The manual GitHub Actions workflow **Build Match Report** uploads
 outputs, report tables, and the Excel workbook.
 
 All files under `output/` are generated artifacts and remain ignored by Git.
+
+## Wilco coaching report
+
+Team profiles are configured in `config/team_profiles.csv`. Build the Wilco
+coach package with:
+
+```powershell
+python -m wilco_as_reporting.cli team-report --match-id 664 --output-dir output/664 --team-key wilco
+python -m wilco_as_reporting.cli team-workbook --match-id 664 --output-dir output/664 --team-key wilco
+python -m wilco_as_reporting.cli build-team --match-id 664 --output-dir output/664 --team-key wilco --include-schedule
+```
+
+The full-match report answers what happened across the match. The Wilco
+package filters and translates those results into team summaries, athlete
+results, awards, squads, stage coaching cues, and a coach-readable review
+queue.
+
+The manual GitHub Actions workflow **Build Team Match Report** uploads
+`match-<match_id>-<team_key>-report`. Match `664` is the completed validation
+match; Match `671` is the Nationals readiness and live-monitoring target.

@@ -10,10 +10,19 @@ from typing import Sequence
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
 from wilco_as_reporting.discovery import discover_matches
 from wilco_as_reporting.parsers import MatchParseError, parse_match
-from wilco_as_reporting.pipeline import build_single_match
+from wilco_as_reporting.pipeline import (
+    build_single_match,
+    build_team_match,
+)
 from wilco_as_reporting.reports import (
     MatchReportError,
+    TeamReportError,
     build_match_report,
+    build_team_report,
+)
+from wilco_as_reporting.team_profiles import (
+    TeamProfileError,
+    load_team_profile,
 )
 from wilco_as_reporting.validators import (
     MatchValidationError,
@@ -21,7 +30,9 @@ from wilco_as_reporting.validators import (
 )
 from wilco_as_reporting.workbooks import (
     MatchWorkbookError,
+    TeamWorkbookError,
     build_match_workbook,
+    build_team_workbook,
 )
 
 
@@ -111,6 +122,49 @@ def build_pipeline_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--match-id", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing raw snapshot files.",
+    )
+    parser.add_argument(
+        "--include-schedule",
+        action="store_true",
+        help="Fetch and save the match schedule snapshot.",
+    )
+    return parser
+
+
+def build_team_report_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli team-report",
+        description="Build coach-focused team report tables.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--team-key", required=True)
+    return parser
+
+
+def build_team_workbook_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli team-workbook",
+        description="Build a coach-focused team workbook.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--team-key", required=True)
+    return parser
+
+
+def build_team_pipeline_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli build-team",
+        description="Build full-match and team coaching artifacts.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--team-key", required=True)
     parser.add_argument(
         "--overwrite",
         action="store_true",
@@ -311,6 +365,109 @@ def run_build(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_team_report(arguments: Sequence[str]) -> int:
+    args = build_team_report_parser().parse_args(arguments)
+    try:
+        profile = load_team_profile(args.team_key)
+        result = build_team_report(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+            profile=profile,
+        )
+    except (TeamProfileError, TeamReportError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    for limitation in result.limitations:
+        print(f"Note: {limitation}")
+    print(f"team report directory: {result.team_summary_path.parent}")
+    return 0
+
+
+def run_team_workbook(arguments: Sequence[str]) -> int:
+    args = build_team_workbook_parser().parse_args(arguments)
+    try:
+        profile = load_team_profile(args.team_key)
+        result = build_team_workbook(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+            profile=profile,
+        )
+    except (TeamProfileError, TeamWorkbookError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"team workbook: {result.path}")
+    print(f"team workbook sheets: {', '.join(result.sheet_names)}")
+    return 0
+
+
+def run_build_team(arguments: Sequence[str]) -> int:
+    args = build_team_pipeline_parser().parse_args(arguments)
+    try:
+        profile = load_team_profile(args.team_key)
+        result = build_team_match(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+            profile=profile,
+            overwrite=args.overwrite,
+            include_schedule=args.include_schedule,
+        )
+    except (
+        SaspApiError,
+        MatchParseError,
+        MatchValidationError,
+        MatchReportError,
+        MatchWorkbookError,
+        TeamProfileError,
+        TeamReportError,
+        TeamWorkbookError,
+    ) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    full = result.full_build
+    print(f"match_id: {args.match_id}")
+    print(f"team_key: {profile.team_key}")
+    print("raw files:")
+    raw_results = [
+        full.snapshots.slots,
+        full.snapshots.leaderboard,
+    ]
+    if full.snapshots.schedule is not None:
+        raw_results.append(full.snapshots.schedule)
+    for snapshot in raw_results:
+        print(f"  {snapshot.path} ({snapshot.status})")
+    print("parsed rows:")
+    print(f"  match_scores.csv: {full.parse_result.match_score_rows}")
+    print(f"  rankings.csv: {full.parse_result.ranking_rows}")
+    print(
+        "  squad_results.csv: "
+        f"{full.parse_result.squad_result_rows}"
+    )
+    print(f"  stage_scores.csv: {full.parse_result.stage_score_rows}")
+    print("validation findings:")
+    for severity in ("ERROR", "WARNING", "REVIEW", "INFO"):
+        count = full.validation_result.severity_counts.get(
+            severity,
+            0,
+        )
+        print(f"  {severity}: {count}")
+    print("full report rows:")
+    for filename, row_count in full.report_result.row_counts.items():
+        print(f"  {filename}: {row_count}")
+    print("team report rows:")
+    for filename, row_count in (
+        result.team_report_result.row_counts.items()
+    ):
+        print(f"  {filename}: {row_count}")
+    for limitation in result.team_report_result.limitations:
+        print(f"team report note: {limitation}")
+    print(f"full workbook: {full.workbook_result.path}")
+    print(f"team workbook: {result.team_workbook_result.path}")
+    return 0
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     command_arguments = list(
         sys.argv[1:] if arguments is None else arguments
@@ -329,6 +486,12 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_workbook(command_arguments[1:])
     if command_arguments and command_arguments[0] == "build":
         return run_build(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "team-report":
+        return run_team_report(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "team-workbook":
+        return run_team_workbook(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "build-team":
+        return run_build_team(command_arguments[1:])
     return run_fetch(command_arguments)
 
 

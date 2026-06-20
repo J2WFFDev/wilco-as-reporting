@@ -130,6 +130,10 @@ During Nationals:
 - later preserve timestamped raw snapshots during event days so changes can
   be audited over time.
 
+The `build-team` command can be run repeatedly for Match `671` to refresh the
+full-match and Wilco coaching artifacts. Before leaderboard scoring is
+complete, award and comparison tables may be empty while registration,
+squads, stage readiness, and validation-review content remain available.
+
 Timestamped event-day snapshots are a future capability. The current refresh
 workflow replaces the current raw snapshot when overwrite is enabled.
-
