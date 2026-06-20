@@ -1,0 +1,70 @@
+name: Build Match Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      match_id:
+        description: SASP match ID to build
+        required: true
+        default: "664"
+        type: string
+      overwrite:
+        description: Overwrite existing raw snapshot files
+        required: true
+        default: true
+        type: boolean
+      include_schedule:
+        description: Fetch the match schedule snapshot
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build-match-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build match report
+        env:
+          MATCH_ID: ${{ inputs.match_id }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          INCLUDE_SCHEDULE: ${{ inputs.include_schedule }}
+          PYTHONPATH: src
+        run: |
+          overwrite_arg=""
+          schedule_arg=""
+
+          if [[ "$OVERWRITE" == "true" ]]; then
+            overwrite_arg="--overwrite"
+          fi
+          if [[ "$INCLUDE_SCHEDULE" == "true" ]]; then
+            schedule_arg="--include-schedule"
+          fi
+
+          python -m wilco_as_reporting.cli build \
+            --match-id "$MATCH_ID" \
+            --output-dir "output/$MATCH_ID" \
+            $overwrite_arg \
+            $schedule_arg
+
+      - name: Upload match report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-${{ inputs.match_id }}-report
+          path: output/${{ inputs.match_id }}
+          retention-days: 14

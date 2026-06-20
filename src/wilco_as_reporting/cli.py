@@ -10,6 +10,7 @@ from typing import Sequence
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
 from wilco_as_reporting.discovery import discover_matches
 from wilco_as_reporting.parsers import MatchParseError, parse_match
+from wilco_as_reporting.pipeline import build_single_match
 from wilco_as_reporting.reports import (
     MatchReportError,
     build_match_report,
@@ -17,6 +18,10 @@ from wilco_as_reporting.reports import (
 from wilco_as_reporting.validators import (
     MatchValidationError,
     validate_match,
+)
+from wilco_as_reporting.workbooks import (
+    MatchWorkbookError,
+    build_match_workbook,
 )
 
 
@@ -86,6 +91,36 @@ def build_report_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--match-id", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
+    return parser
+
+
+def build_workbook_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli workbook",
+        description="Build an Excel workbook from report-ready tables.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    return parser
+
+
+def build_pipeline_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli build",
+        description="Build a complete single-match report artifact.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing raw snapshot files.",
+    )
+    parser.add_argument(
+        "--include-schedule",
+        action="store_true",
+        help="Fetch and save the match schedule snapshot.",
+    )
     return parser
 
 
@@ -216,6 +251,66 @@ def run_report(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_workbook(arguments: Sequence[str]) -> int:
+    args = build_workbook_parser().parse_args(arguments)
+    try:
+        result = build_match_workbook(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+        )
+    except MatchWorkbookError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    print(f"workbook: {result.path}")
+    print(f"workbook sheets: {', '.join(result.sheet_names)}")
+    return 0
+
+
+def run_build(arguments: Sequence[str]) -> int:
+    args = build_pipeline_parser().parse_args(arguments)
+    try:
+        result = build_single_match(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+            overwrite=args.overwrite,
+            include_schedule=args.include_schedule,
+        )
+    except (
+        SaspApiError,
+        MatchParseError,
+        MatchValidationError,
+        MatchReportError,
+        MatchWorkbookError,
+    ) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    raw_results = [
+        result.snapshots.slots,
+        result.snapshots.leaderboard,
+    ]
+    if result.snapshots.schedule is not None:
+        raw_results.append(result.snapshots.schedule)
+    print("raw files:")
+    for snapshot in raw_results:
+        print(f"  {snapshot.path} ({snapshot.status})")
+    print("parsed rows:")
+    print(f"  match_scores.csv: {result.parse_result.match_score_rows}")
+    print(f"  rankings.csv: {result.parse_result.ranking_rows}")
+    print(f"  squad_results.csv: {result.parse_result.squad_result_rows}")
+    print(f"  stage_scores.csv: {result.parse_result.stage_score_rows}")
+    print("validation findings:")
+    for severity in ("ERROR", "WARNING", "REVIEW", "INFO"):
+        count = result.validation_result.severity_counts.get(severity, 0)
+        print(f"  {severity}: {count}")
+    print("report rows:")
+    for filename, row_count in result.report_result.row_counts.items():
+        print(f"  {filename}: {row_count}")
+    print(f"workbook: {result.workbook_result.path}")
+    return 0
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     command_arguments = list(
         sys.argv[1:] if arguments is None else arguments
@@ -230,6 +325,10 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_validate(command_arguments[1:])
     if command_arguments and command_arguments[0] == "report":
         return run_report(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "workbook":
+        return run_workbook(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "build":
+        return run_build(command_arguments[1:])
     return run_fetch(command_arguments)
 
 

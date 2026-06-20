@@ -60,3 +60,26 @@ Start here:
 ## Key rule
 
 Validation comes before reporting. Reports should trust validated score tables, not independently interpret raw JSON each time.
+
+## Single-match pipeline
+
+Run each processing stage independently:
+
+```powershell
+python -m wilco_as_reporting.cli parse --match-id 664 --output-dir output/664
+python -m wilco_as_reporting.cli validate --match-id 664 --output-dir output/664
+python -m wilco_as_reporting.cli report --match-id 664 --output-dir output/664
+python -m wilco_as_reporting.cli workbook --match-id 664 --output-dir output/664
+```
+
+Or run the full fetch-to-workbook pipeline:
+
+```powershell
+python -m wilco_as_reporting.cli build --match-id 664 --output-dir output/664 --include-schedule
+```
+
+The manual GitHub Actions workflow **Build Match Report** uploads
+`match-<match_id>-report`, containing raw snapshots, parsed tables, validation
+outputs, report tables, and the Excel workbook.
+
+All files under `output/` are generated artifacts and remain ignored by Git.

@@ -22,6 +22,45 @@ Official individual award placements retain Class scope, squads retain
 Division scope, and overall discipline comparison rows remain explicitly
 marked with `award_scope = Comparison`.
 
+## Workbook generation
+
+Build the Excel workbook after report tables are available:
+
+```powershell
+python -m wilco_as_reporting.cli workbook --match-id 664 --output-dir output/664
+```
+
+The workbook is written to:
+
+```text
+output/<match_id>/workbooks/match_<match_id>_report.xlsx
+```
+
+It contains Cover, Team Summary, Athlete Summary, Award Results, Squad
+Summary, Stage Performance, Coach Review Queue, and Validation Rollup tabs.
+The workbook is a generated artifact, not source-controlled data.
+
+## End-to-end single-match build
+
+Run the full single-match pipeline with:
+
+```powershell
+python -m wilco_as_reporting.cli build --match-id 664 --output-dir output/664 --include-schedule
+```
+
+The command fetches raw snapshots, parses base tables, validates scores,
+builds report tables, and creates the workbook. Validation findings with
+severity `ERROR` are included in the artifact and do not by themselves fail
+the pipeline.
+
+The GitHub Actions workflow **Build Match Report** runs the same pipeline
+without local Python. Its `match-<match_id>-report` artifact contains raw JSON
+snapshots, parsed tables, validation outputs, report tables, and the workbook.
+Artifacts use a 14-day retention period.
+
+All generated files remain under ignored `output/` paths and must not be
+committed.
+
 ## Award and ranking scope rules
 
 For large matches such as Nationals:
