@@ -55,13 +55,49 @@ Performance anomalies should be reviewed, not automatically treated as errors.
 
 ### 10. Build small first
 
-The first working pipeline should fetch one match, parse a small set of tables, and validate the data before building full workbooks or advanced analytics.
+Build API foundation first, then parsing, then validation, then reports. Do not jump directly to Excel, highlights, or historical analytics before raw data access and basic parsing are reliable.
+
+## Current implementation process
+
+The active process is:
+
+```text
+1. Discover matches
+2. Filter usable matches
+3. Fetch selected match data
+4. Save raw snapshots
+5. Parse clean tables
+6. Validate scores
+7. Generate reports and artifacts
+```
+
+## API foundation phases
+
+Before parsing begins, the API foundation should be completed in small steps:
+
+```text
+Phase 2A.1 — API fetch and raw snapshots
+Phase 2A.2 — GitHub Actions runner
+Phase 2A.3 — Match discovery and match index
+```
+
+### Phase 2A.1
+
+Fetch known match data by match ID and save immutable raw snapshots.
+
+### Phase 2A.2
+
+Run the fetch pipeline in GitHub Actions so local Python is not required.
+
+### Phase 2A.3
+
+Use the competition list API to discover matches, paginate results, filter test matches, and build a match index.
 
 ## First implementation target
 
 Match ID `664` should be used as the first test case.
 
-Minimum useful outputs:
+Minimum useful parsing outputs after the API foundation is proven:
 
 - `match_scores.csv`
 - `rankings.csv`
