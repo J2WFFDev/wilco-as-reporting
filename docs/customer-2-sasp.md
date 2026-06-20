@@ -100,17 +100,23 @@ Generic SASP reporting should expose rank type and award scope explicitly so rep
 
 ## Generic SASP historical analytics
 
-Potential national-level metrics:
+Historical analytics should use award-scope and field-size-aware benchmarks instead of fixed Top 1 / Top 3 / Top 5 / Top 10 cohorts.
 
-- Podium Thresholds
-- Nationals Difficulty Index
-- Compression Index
-- Improvement Velocity
-- Stage Difficulty Index
-- Stage Separation Index
-- Participation Growth
-- Discipline Trends
-- Year-over-Year Top 1 / Top 3 / Top 5 / Top 10 medians
+Core benchmarks should always include Winner Threshold, Award Threshold, and Field Median.
+
+Optional benchmarks should depend on cohort size:
+
+- Use Top 10 Benchmark only when the cohort has 30 or more competitors.
+- Use Top 25 Benchmark only when the cohort has 75 or more competitors.
+
+Benchmark cohorts should follow award scope:
+
+- Individual HOA uses Discipline plus Class.
+- Gender context uses Discipline plus Class plus Gender when that board exists.
+- Squad rankings use Discipline plus Division.
+- Overall discipline comparison uses all competitors in the discipline.
+
+Additional historical metrics may include Nationals Difficulty Index, Compression Index, Improvement Velocity, Stage Difficulty Index, Stage Separation Index, Participation Growth, and Discipline Trends.
 
 ## Hardcopy score sheet reconciliation
 
