@@ -1,5 +1,27 @@
 # Report Packages
 
+## Report table layer
+
+Parsed and validated match data should be converted into report-ready CSV
+tables before workbook generation:
+
+```powershell
+python -m wilco_as_reporting.cli report --match-id 664 --output-dir output/664
+```
+
+The command writes `output/<match_id>/report_tables/` with team, athlete,
+award, squad, stage-performance, validation-rollup, and coach-review tables.
+These tables provide a stable input layer for a future Excel workbook.
+
+The report table layer does not create highlights, historical analytics, or
+Excel files. Workbook generation should consume these report-ready tables only
+after parsing and validation have completed.
+
+`team_summary.csv` contains one row per team represented in the match.
+Official individual award placements retain Class scope, squads retain
+Division scope, and overall discipline comparison rows remain explicitly
+marked with `award_scope = Comparison`.
+
 ## Award and ranking scope rules
 
 For large matches such as Nationals:

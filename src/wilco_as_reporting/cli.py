@@ -10,6 +10,10 @@ from typing import Sequence
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
 from wilco_as_reporting.discovery import discover_matches
 from wilco_as_reporting.parsers import MatchParseError, parse_match
+from wilco_as_reporting.reports import (
+    MatchReportError,
+    build_match_report,
+)
 from wilco_as_reporting.validators import (
     MatchValidationError,
     validate_match,
@@ -69,6 +73,16 @@ def build_validate_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m wilco_as_reporting.cli validate",
         description="Validate parsed SASP match score tables.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    return parser
+
+
+def build_report_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli report",
+        description="Build report-ready SASP match CSV tables.",
     )
     parser.add_argument("--match-id", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
@@ -185,6 +199,23 @@ def run_validate(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_report(arguments: Sequence[str]) -> int:
+    args = build_report_parser().parse_args(arguments)
+    try:
+        result = build_match_report(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+        )
+    except MatchReportError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    print(f"report tables directory: {result.team_summary_path.parent}")
+    return 0
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     command_arguments = list(
         sys.argv[1:] if arguments is None else arguments
@@ -197,6 +228,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_parse(command_arguments[1:])
     if command_arguments and command_arguments[0] == "validate":
         return run_validate(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "report":
+        return run_report(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
