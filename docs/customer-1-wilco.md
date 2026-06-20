@@ -23,6 +23,16 @@ Wilco's goal is not just reporting. It is athlete development, coach execution, 
 - What should coaches know while standing at a stage?
 - What stories should be shared after the match?
 
+## Important ranking clarification
+
+For large matches such as Nationals:
+
+- Individual High Overall / HOA awards are determined by Class, not Division.
+- Squad rankings are always Divisional.
+- Discipline-level overall boards may rank everyone together for comparison, but award interpretation must respect the correct award basis.
+
+This distinction matters when generating highlights, podium summaries, gap-to-award calculations, and near-miss language.
+
 ## Required report packages
 
 ### 1. Wilco Match Operations Workbook
@@ -100,6 +110,8 @@ Flattened one-row-per-squad view:
 - Athlete 4 / Score 4
 - Squad detail text
 
+Squad rank scope should be treated as Divisional, even when the leaderboard text uses broader wording.
+
 ### 6. Highlights
 
 Highlights should be story-quality, not raw leaderboard duplication.
@@ -116,7 +128,7 @@ Use hierarchy:
 2. Overall Runner-Up
 3. Close to Overall Win
 4. Overall Top 5
-5. Division Winner
+5. HOA Class Winner
 6. Gender Winner
 7. Podium / Award
 8. Near Award Miss
@@ -128,6 +140,8 @@ Use hierarchy:
 14. Team Record
 
 Near Award Miss should only apply when place is outside award places but within a defined margin of the award cutoff.
+
+For Nationals-style matches, individual HOA highlights should reference Class-based awards, not Division-based awards. Squad highlights should reference Divisional rankings.
 
 ## Wilco-specific metrics
 
