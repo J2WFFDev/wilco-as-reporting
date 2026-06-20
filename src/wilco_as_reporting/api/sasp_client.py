@@ -59,6 +59,10 @@ class SaspClient:
         url = f"{self.BASE_URL}/sasp-leaderboard/{match_id}"
         return self._get_json(url)
 
+    def fetch_competitions_page(self, page: int) -> Any:
+        url = f"{self.BASE_URL}/SASP/competitions"
+        return self._get_json(url, params={"type": "S", "page": page})
+
     def fetch_match_snapshots(
         self,
         match_id: int,
@@ -100,9 +104,18 @@ class SaspClient:
             leaderboard=leaderboard_result,
         )
 
-    def _get_json(self, url: str) -> Any:
+    def _get_json(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
         try:
-            response = self.session.get(url, timeout=self.timeout)
+            response = self.session.get(
+                url,
+                params=params,
+                timeout=self.timeout,
+            )
             response.raise_for_status()
         except requests.RequestException as exc:
             raise SaspHttpError(f"HTTP request failed for {url}: {exc}") from exc

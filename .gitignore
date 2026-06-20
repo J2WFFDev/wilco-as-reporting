@@ -22,6 +22,7 @@ data/processed/
 *.xlsx
 *.csv
 *.zip
+!config/match_overrides.csv
 
 # OS / editors
 .DS_Store

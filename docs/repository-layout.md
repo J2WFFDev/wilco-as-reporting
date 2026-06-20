@@ -7,6 +7,14 @@ This project uses a scalable Python package layout.
 ```text
 wilco-as-reporting/
 │
+├── .github/
+│   └── workflows/
+│       ├── fetch-match.yml
+│       └── discover-matches.yml
+│
+├── config/
+│   └── match_overrides.csv
+│
 ├── docs/
 │   ├── customer-1-wilco.md
 │   ├── customer-2-sasp.md
@@ -21,6 +29,7 @@ wilco-as-reporting/
 │   └── wilco_as_reporting/
 │       ├── __init__.py
 │       ├── cli.py
+│       ├── discovery.py
 │       ├── api/
 │       │   ├── __init__.py
 │       │   └── sasp_client.py
@@ -61,6 +70,11 @@ wilco-as-reporting/
 
 Fetch data from SASP API endpoints and save raw JSON snapshots.
 
+### `discovery.py`
+
+Paginate the competition list endpoint, preserve raw page snapshots, flatten
+the discovered match catalog, and apply curated include/exclude overrides.
+
 ### `parsers/`
 
 Convert raw SASP JSON into normalized table data.
@@ -92,6 +106,13 @@ Example future command:
 
 ```powershell
 python -m wilco_as_reporting.cli --match-id 664 --team-id 1894 --output-dir output/664
+```
+
+Current acquisition commands:
+
+```powershell
+python -m wilco_as_reporting.cli --match-id 664 --output-dir output/664 --overwrite
+python -m wilco_as_reporting.cli discover --output-dir output/discovery --overwrite
 ```
 
 ## Data flow

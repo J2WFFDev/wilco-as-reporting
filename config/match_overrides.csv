@@ -1,0 +1,4 @@
+match_id,force_include,force_exclude,label,notes
+49,false,true,Test/Schedule,Known test or non-production schedule match
+664,true,false,2026 Texas State,Known real match used for validation
+671,true,false,2026 Nationals,Target Nationals match

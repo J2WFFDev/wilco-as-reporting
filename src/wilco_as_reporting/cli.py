@@ -1,14 +1,17 @@
-"""Command-line interface for fetching raw SASP match data."""
+"""Command-line interface for SASP data acquisition and discovery."""
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+from typing import Sequence
 
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
+from wilco_as_reporting.discovery import discover_matches
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_fetch_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Fetch immutable raw SASP JSON snapshots for a match."
     )
@@ -22,8 +25,28 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
+def build_discover_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli discover",
+        description="Discover SASP competitions and build match indexes.",
+    )
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--overrides",
+        default=Path("config/match_overrides.csv"),
+        type=Path,
+        help="Curated match override CSV.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing raw discovery snapshots.",
+    )
+    return parser
+
+
+def run_fetch(arguments: Sequence[str]) -> int:
+    args = build_fetch_parser().parse_args(arguments)
     client = SaspClient()
 
     try:
@@ -48,6 +71,39 @@ def main() -> int:
     return 0
 
 
+def run_discover(arguments: Sequence[str]) -> int:
+    args = build_discover_parser().parse_args(arguments)
+    client = SaspClient()
+
+    try:
+        result = discover_matches(
+            client,
+            output_dir=args.output_dir,
+            overrides_path=args.overrides,
+            overwrite=args.overwrite,
+        )
+    except (SaspApiError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    print(f"pages processed: {result.pages_processed}")
+    print(f"matches discovered: {result.matches_discovered}")
+    print(f"matches included: {result.matches_included}")
+    print(f"match index: {result.match_index_path}")
+    print(f"effective match index: {result.effective_match_index_path}")
+    return 0
+
+
+def main(arguments: Sequence[str] | None = None) -> int:
+    command_arguments = list(
+        sys.argv[1:] if arguments is None else arguments
+    )
+    if command_arguments and command_arguments[0] == "discover":
+        return run_discover(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "fetch":
+        return run_fetch(command_arguments[1:])
+    return run_fetch(command_arguments)
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
-

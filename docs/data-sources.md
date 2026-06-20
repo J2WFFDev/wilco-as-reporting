@@ -83,21 +83,16 @@ Initial exclusion rules:
 - Exclude names containing `copy`.
 - Exclude names containing `do not use`.
 
-There should also be a manual exclusion list, for example:
+Curated include and exclude decisions are stored in:
 
 ```text
-config/excluded_matches.json
+config/match_overrides.csv
 ```
 
-Example known exclusion:
+Columns:
 
-```json
-{
-  "excluded_match_ids": [49],
-  "notes": {
-    "49": "Known test/schedule match; do not use for reporting"
-  }
-}
+```text
+match_id,force_include,force_exclude,label,notes
 ```
 
 Example schedule/test endpoint to avoid as production reporting input:
@@ -254,6 +249,7 @@ Preferred stage-name priority:
 ```text
 output/discovery/raw/competitions_page_1.json
 output/discovery/tables/match_index.csv
+output/discovery/tables/effective_match_index.csv
 output/664/raw/664_slots.json
 output/664/raw/664_leaderboard.json
 output/664/raw/664_schedule.json
@@ -269,3 +265,16 @@ Wilco Shooting Sports:
 ```text
 1894
 ```
+
+## Discovery command
+
+Run discovery locally or in GitHub Actions:
+
+```powershell
+python -m wilco_as_reporting.cli discover --output-dir output/discovery --overwrite
+```
+
+`match_index.csv` contains every discovered competition. The effective index
+applies automatic name filtering and `config/match_overrides.csv`. A forced
+exclusion takes precedence, while a forced inclusion can retain a discovered
+match that would otherwise be removed by automatic name filtering.
