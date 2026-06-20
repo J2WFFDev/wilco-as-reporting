@@ -1,1 +1,62 @@
-# wilco-as-reporting
+# Wilco AS Reporting
+
+Analytics and reporting framework for SASP match data.
+
+This repository is being structured for two related customers:
+
+1. **Customer 1: Wilco Shooting Sports internal use**  
+   Coach-focused reporting, match operations, athlete development, Nationals preparation, and Wilco-specific historical analytics.
+
+2. **Customer 2: SASP staff / organization use**  
+   Generic validation, score audit, match reporting, and national analytics concepts that could be adapted beyond Wilco.
+
+## Current data sources
+
+SASP data is available through public JSON API endpoints:
+
+```text
+Slots:
+https://virtual.sssfonline.com/api/shot/SASP/competitions/{match_id}/slots
+
+Leaderboard:
+https://virtual.sssfonline.com/api/shot/sasp-leaderboard/{match_id}
+
+Competition list:
+https://virtual.sssfonline.com/api/shot/SASP/competitions?type=S&page=1
+```
+
+Known match IDs:
+
+| Match ID | Match |
+|---:|---|
+| 664 | 2026 Texas State SASP Championship Match |
+| 671 | 2026 SASP National Championships |
+
+## Project direction
+
+The project should develop in layers:
+
+```text
+Raw SASP API JSON
+  -> Raw JSON snapshots
+  -> Score validation / audit tables
+  -> Clean normalized reporting tables
+  -> Wilco operations workbook
+  -> Wilco results package
+  -> SASP generic reporting / analytics framework
+```
+
+## Documentation
+
+Start here:
+
+- [`docs/customer-1-wilco.md`](docs/customer-1-wilco.md)
+- [`docs/customer-2-sasp.md`](docs/customer-2-sasp.md)
+- [`docs/data-sources.md`](docs/data-sources.md)
+- [`docs/report-packages.md`](docs/report-packages.md)
+- [`docs/metrics-and-validation.md`](docs/metrics-and-validation.md)
+- [`docs/codex-master-prompt.md`](docs/codex-master-prompt.md)
+
+## Key rule
+
+Validation comes before reporting. Reports should trust validated score tables, not independently interpret raw JSON each time.
