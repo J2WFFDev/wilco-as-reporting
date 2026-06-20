@@ -23,6 +23,16 @@ This customer stream should remain neutral and not Wilco-specific.
 - Can match directors get a clean report without manually reviewing raw JSON?
 - What national trends can be measured year over year?
 
+## Important ranking clarification
+
+For large matches such as Nationals:
+
+- Individual High Overall / HOA awards are determined by Class, not Division.
+- Squad rankings are always Divisional.
+- Overall discipline leaderboards may rank everyone together, but award interpretation must preserve the official award scope.
+
+Generic SASP reporting should expose rank type and award scope explicitly so reports do not confuse Overall comparison, Class-based HOA, gender context, and Divisional squad rankings.
+
 ## Generic SASP validation framework
 
 ### Validation categories
@@ -51,6 +61,8 @@ This customer stream should remain neutral and not Wilco-specific.
 - Leaderboard score matches slot-level final score within tolerance
 - Squad score equals sum of four athlete scores
 - Squad has four contributing athletes
+- Squad ranking scope is Divisional
+- Individual HOA ranking scope is Class-based for large matches such as Nationals
 - DQ and DNF records are handled separately
 - Duplicate athlete / discipline entries are flagged
 - Penalties reconcile with scored totals
@@ -69,17 +81,17 @@ This customer stream should remain neutral and not Wilco-specific.
 
 ### Results summary
 
-- Overall winners
-- Division winners
-- Gender winners
-- Squad winners
+- Overall discipline winners
+- Class-based HOA winners
+- Gender-context winners, where present
+- Divisional squad winners
 - Close finishes
 - Participation statistics
 
 ### Squad results
 
 - Discipline
-- Rank scope
+- Divisional rank scope
 - Squad name
 - Place
 - Score
