@@ -653,9 +653,11 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def _clean_number(value: float | None) -> float | int | str:
+def _clean_number(value: float | int | None) -> float | int | str:
     if value is None:
         return ""
+    if isinstance(value, int):
+        return value
     if value.is_integer():
         return int(value)
     return value
