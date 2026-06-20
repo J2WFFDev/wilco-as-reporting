@@ -10,6 +10,10 @@ from typing import Sequence
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
 from wilco_as_reporting.discovery import discover_matches
 from wilco_as_reporting.parsers import MatchParseError, parse_match
+from wilco_as_reporting.validators import (
+    MatchValidationError,
+    validate_match,
+)
 
 
 def build_fetch_parser() -> argparse.ArgumentParser:
@@ -55,6 +59,16 @@ def build_parse_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m wilco_as_reporting.cli parse",
         description="Parse raw SASP match snapshots into base CSV tables.",
+    )
+    parser.add_argument("--match-id", required=True, type=int)
+    parser.add_argument("--output-dir", required=True, type=Path)
+    return parser
+
+
+def build_validate_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli validate",
+        description="Validate parsed SASP match score tables.",
     )
     parser.add_argument("--match-id", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
@@ -137,6 +151,40 @@ def run_parse(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_validate(arguments: Sequence[str]) -> int:
+    args = build_validate_parser().parse_args(arguments)
+    try:
+        result = validate_match(
+            match_id=args.match_id,
+            output_dir=args.output_dir,
+        )
+    except MatchValidationError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    print(f"validation summary rows: {result.summary_rows}")
+    print(f"validation finding rows: {result.finding_rows}")
+    print(
+        "match reconciliation rows: "
+        f"{result.match_reconciliation_rows}"
+    )
+    print(
+        "stage reconciliation rows: "
+        f"{result.stage_reconciliation_rows}"
+    )
+    print(
+        "squad reconciliation rows: "
+        f"{result.squad_reconciliation_rows}"
+    )
+    for severity in ("ERROR", "WARNING", "REVIEW", "INFO"):
+        print(
+            f"{severity} findings: "
+            f"{result.severity_counts.get(severity, 0)}"
+        )
+    print(f"validation directory: {result.validation_summary_path.parent}")
+    return 0
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     command_arguments = list(
         sys.argv[1:] if arguments is None else arguments
@@ -147,6 +195,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_fetch(command_arguments[1:])
     if command_arguments and command_arguments[0] == "parse":
         return run_parse(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "validate":
+        return run_validate(command_arguments[1:])
     return run_fetch(command_arguments)
 
 

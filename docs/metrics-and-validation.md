@@ -4,6 +4,52 @@
 
 Reports should be generated from validated tables. Raw JSON should be parsed once, normalized, validated, and then used for reporting.
 
+Run validation after parsing:
+
+```powershell
+python -m wilco_as_reporting.cli validate --match-id 664 --output-dir output/664
+```
+
+## Validation outputs
+
+Validation writes:
+
+- `validation_summary.csv`: one row per validation check type.
+- `validation_findings.csv`: one row per error, warning, review item, or
+  informational context finding.
+- `match_score_reconciliation.csv`: match final compared with the sum of
+  scored stages.
+- `stage_score_reconciliation.csv`: four-counting-string structure and scored
+  average checks for each stage.
+- `squad_score_reconciliation.csv`: squad score compared with the four listed
+  athlete scores.
+
+These files are generated under `output/<match_id>/validation/`.
+
+## Severity model
+
+| Severity | Meaning |
+| --- | --- |
+| `ERROR` | Mathematical mismatch or missing required score data |
+| `WARNING` | Incomplete or suspicious data that may be explainable |
+| `REVIEW` | Performance anomaly or manual-review item |
+| `INFO` | Context that does not invalidate the score |
+
+Fast performance is never an error solely because it is fast. A fastest
+non-zero string below 1.20 seconds is a `REVIEW` item. A value below 0.73
+seconds is a stronger `REVIEW` item, not an automatic invalidation.
+
+The current parsed stage table preserves stage score, scored average, fastest
+non-zero string, and dropped-string count. It does not retain every individual
+string value. Stage validation therefore confirms four-string structure and
+internal stage arithmetic but does not independently re-sum the original four
+counting strings.
+
+The parsed tables also do not retain the raw procedural-penalty field. A
+positive match-to-stage difference in a three-second increment is classified
+as an informational possible match-level adjustment. Other mathematical
+differences remain errors.
+
 ## Validation layers
 
 ### Level 1: Mathematical Integrity
