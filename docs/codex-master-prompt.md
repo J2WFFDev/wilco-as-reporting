@@ -83,6 +83,34 @@ Known match IDs:
 5. Keep Wilco-specific logic separate from generic SASP logic.
 6. Keep report tables readable and coach-usable.
 7. Keep audit/detail tables available but not front-facing.
+8. Preserve award scope correctly.
+
+## Ranking and award scope rules
+
+For large matches such as Nationals:
+
+- Individual High Overall / HOA awards are determined by Class, not Division.
+- Squad rankings are always Divisional.
+- Overall discipline leaderboards may rank all competitors together, but those are comparison boards and should not be confused with Class-based HOA awards.
+
+Rank parsing should expose separate fields where possible:
+
+- rank_type
+- rank_scope
+- award_scope
+- leaderboard_name
+- leaderboard_type
+
+Suggested rank types:
+
+- Overall Discipline Comparison
+- HOA Class
+- Gender Context
+- Gender Class
+- Squad Divisional
+- Special / Other
+
+Do not label individual Nationals HOA results as Division awards. Do not label squad results as Class awards.
 
 ## Initial implementation goal
 
@@ -149,7 +177,7 @@ Use clean narrative categories:
 - Overall Runner-Up
 - Close to Overall Win
 - Overall Top 5
-- Division Winner
+- HOA Class Winner
 - Gender Winner
 - Podium / Award
 - Near Award Miss
@@ -161,6 +189,8 @@ Use clean narrative categories:
 - Team Record
 
 Near Award Miss should only apply when the athlete or squad finished outside award places but within the configured margin of the award cutoff.
+
+For Nationals-style matches, individual HOA highlights should use Class-based award language. Squad highlights should use Divisional language.
 
 ## Match Records
 
