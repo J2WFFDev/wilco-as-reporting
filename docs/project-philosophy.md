@@ -93,6 +93,14 @@ Run the fetch pipeline in GitHub Actions so local Python is not required.
 
 Use the competition list API to discover matches, paginate results, filter test matches, and build a match index.
 
+## Live-event refresh
+
+Nationals match `671` is a monitoring target rather than a one-time download.
+The raw slots, leaderboard, and optional schedule snapshots should support
+repeated refresh while registration and results are changing during the
+event. Refreshing raw snapshots does not replace the later parsing,
+validation, or reporting phases.
+
 ## First implementation target
 
 Match ID `664` should be used as the first test case.

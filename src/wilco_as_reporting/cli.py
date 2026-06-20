@@ -22,6 +22,11 @@ def build_fetch_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Replace existing raw snapshot files.",
     )
+    parser.add_argument(
+        "--include-schedule",
+        action="store_true",
+        help="Fetch and save the match schedule snapshot.",
+    )
     return parser
 
 
@@ -54,6 +59,7 @@ def run_fetch(arguments: Sequence[str]) -> int:
             match_id=args.match_id,
             output_dir=args.output_dir,
             overwrite=args.overwrite,
+            include_schedule=args.include_schedule,
         )
     except SaspApiError as exc:
         print(f"Error: {exc}")
@@ -68,6 +74,11 @@ def run_fetch(arguments: Sequence[str]) -> int:
         f"leaderboard file: {snapshots.leaderboard.path} "
         f"({snapshots.leaderboard.status})"
     )
+    if snapshots.schedule is not None:
+        print(
+            f"schedule file: {snapshots.schedule.path} "
+            f"({snapshots.schedule.status})"
+        )
     return 0
 
 

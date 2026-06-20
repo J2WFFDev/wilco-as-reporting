@@ -233,6 +233,17 @@ Preferred stage-name priority:
 2. Match notes or schedule notes when clearly more accurate.
 3. Slots `spp1` through `spp4` structural codes as fallback.
 
+The fetch CLI can include the schedule snapshot when requested:
+
+```powershell
+python -m wilco_as_reporting.cli fetch --match-id 671 --output-dir output/671 --overwrite --include-schedule
+```
+
+Nationals match `671` should support repeated refreshes while registration,
+schedule details, and results are updated during the event. Each refresh
+should fetch current slots and leaderboard data and may include the schedule
+snapshot.
+
 ## Recommended ingestion pattern
 
 1. Fetch competition list pages.

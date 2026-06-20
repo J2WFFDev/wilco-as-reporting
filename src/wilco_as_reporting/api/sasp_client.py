@@ -36,6 +36,7 @@ class SnapshotResult:
 class MatchSnapshots:
     slots: SnapshotResult
     leaderboard: SnapshotResult
+    schedule: SnapshotResult | None = None
 
 
 class SaspClient:
@@ -59,6 +60,10 @@ class SaspClient:
         url = f"{self.BASE_URL}/sasp-leaderboard/{match_id}"
         return self._get_json(url)
 
+    def fetch_schedule(self, match_id: int) -> Any:
+        url = f"{self.BASE_URL}/sasp-schedule/{match_id}"
+        return self._get_json(url)
+
     def fetch_competitions_page(self, page: int) -> Any:
         url = f"{self.BASE_URL}/SASP/competitions"
         return self._get_json(url, params={"type": "S", "page": page})
@@ -68,11 +73,13 @@ class SaspClient:
         match_id: int,
         output_dir: Path | str,
         overwrite: bool = False,
+        include_schedule: bool = False,
     ) -> MatchSnapshots:
         output_path = Path(output_dir)
         raw_dir = output_path / "raw"
         slots_path = raw_dir / f"{match_id}_slots.json"
         leaderboard_path = raw_dir / f"{match_id}_leaderboard.json"
+        schedule_path = raw_dir / f"{match_id}_schedule.json"
 
         self._ensure_raw_directory(raw_dir)
 
@@ -98,10 +105,23 @@ class SaspClient:
             exists=leaderboard_exists,
             overwrite=overwrite,
         )
+        schedule_result = None
+        if include_schedule:
+            schedule_exists = schedule_path.exists()
+            schedule_data = None
+            if overwrite or not schedule_exists:
+                schedule_data = self.fetch_schedule(match_id)
+            schedule_result = self._save_snapshot(
+                schedule_path,
+                schedule_data,
+                exists=schedule_exists,
+                overwrite=overwrite,
+            )
 
         return MatchSnapshots(
             slots=slots_result,
             leaderboard=leaderboard_result,
+            schedule=schedule_result,
         )
 
     def _get_json(
