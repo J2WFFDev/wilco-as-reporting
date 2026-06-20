@@ -17,7 +17,11 @@ Report logic must keep these scopes separate:
 | Squad rankings | Division |
 | Overall discipline comparison | All competitors in discipline |
 
-## Package 1: Wilco Match Operations Package
+## Customer 1: Wilco report packages
+
+These packages are Wilco-specific and should not be presented as generic SASP deliverables.
+
+### Package 1: Wilco Match Operations Package
 
 Customer: Wilco Shooting Sports.
 
@@ -72,7 +76,7 @@ Match Records should include only meaningful records:
 
 Do not include derived records such as fastest average match pace.
 
-## Package 2: Wilco Match Results and Story Package
+### Package 2: Wilco Match Results and Story Package
 
 Customer: Wilco Shooting Sports.
 
@@ -102,7 +106,28 @@ A second-place finish in a TOP 1 board is runner-up or close to win, not a near 
 
 For Nationals-style matches, individual award highlights should use Class-based HOA language. Squad highlights should use Divisional language.
 
-## Package 3: SASP Match Validation and Score Audit
+### Suggested Wilco workbook tab order
+
+1. Dashboard
+2. Score Audit Summary
+3. Registered Athletes
+4. Match Scores
+5. Rankings
+6. Stage Coach View
+7. Athlete Stage Matrix
+8. Squad Report
+9. Squad Members
+10. Wilco vs Field
+11. Match Records
+12. Highlights
+13. String Detail
+14. Warnings
+
+## Customer 2: SASP framework packages
+
+These packages are generic and should be safe to share with SASP staff without Wilco-specific assumptions.
+
+### Package 3: SASP Match Validation and Score Audit
 
 Customer: SASP staff and match directors.
 
@@ -126,7 +151,7 @@ Severity levels:
 - ORANGE
 - INFO
 
-## Package 4: SASP Reporting and Historical Analytics
+### Package 4: SASP Reporting and Historical Analytics
 
 Customer: SASP staff and organization.
 
@@ -141,29 +166,42 @@ Generic reports:
 - Participation Statistics
 - Close Finishes
 
-Historical analytics:
+Historical analytics should use meaningful award-scope benchmarks instead of hard-coded Top 1 / Top 3 / Top 5 / Top 10 cohorts.
 
-- Podium Thresholds
+Core benchmarks, always calculated where data exists:
+
+- Winner Threshold
+- Award Threshold, meaning the final awarded place in the correct cohort
+- Field Median
+
+Optional benchmarks, based on cohort size:
+
+| Cohort Size | Optional Benchmark |
+|---:|---|
+| 30 or more competitors | Top 10 Benchmark |
+| 75 or more competitors | Top 25 Benchmark |
+
+Compression and competitiveness metrics:
+
+- Winner to Award Gap
+- Award to Median Gap
+- Winner to Median Gap
 - Nationals Difficulty Index
-- Compression Index
 - Improvement Velocity
 - Stage Difficulty Index
-- Year-over-Year Top 1, Top 3, Top 5, and Top 10 metrics
+- Stage Separation Index
 - Discipline Trends
 
-## Suggested workbook tab order for Wilco
+### Suggested generic SASP workbook tab order
 
-1. Dashboard
+1. Match Summary
 2. Score Audit Summary
-3. Registered Athletes
-4. Match Scores
-5. Rankings
-6. Stage Coach View
-7. Athlete Stage Matrix
-8. Squad Report
-9. Squad Members
-10. Wilco vs Field
-11. Match Records
-12. Highlights
-13. String Detail
-14. Warnings
+3. Math Validation
+4. Completeness Checks
+5. String Anomalies
+6. Athlete Results
+7. Squad Results
+8. Awards
+9. Close Finishes
+10. Historical Benchmarks
+11. Warnings
