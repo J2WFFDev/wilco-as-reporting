@@ -4,7 +4,109 @@
 
 The current project should use API-first data access rather than relying on local JSON folders.
 
-### Slots endpoint
+## Process overview
+
+The intended data process is:
+
+```text
+1. Discover matches
+2. Filter usable matches
+3. Fetch selected match data
+4. Save raw snapshots
+5. Parse clean tables
+6. Validate scores
+7. Generate reports and artifacts
+```
+
+The API foundation should be built in three small pieces before parsing begins:
+
+```text
+Phase 2A.1 — API fetch and raw snapshots
+Phase 2A.2 — GitHub Actions runner
+Phase 2A.3 — Match discovery and match index
+```
+
+## Match discovery endpoint
+
+```text
+https://virtual.sssfonline.com/api/shot/SASP/competitions?type=S&page=1
+```
+
+Primary use:
+
+- Discover available SASP matches.
+- Build a match index.
+- Identify State, Regional, National, Local, and Virtual matches.
+- Identify current and prior Nationals match IDs.
+- Avoid manually hard-coding match IDs when possible.
+
+The discovery process should paginate until no more results are returned.
+
+Important fields to preserve where present:
+
+- `id`
+- `name`
+- `start_date`
+- `end_date`
+- `post_raw`
+- `post`
+- `type`
+- `notes`
+- stage or taxonomy fields, where present
+
+### Match classification
+
+Use `post_raw` as the primary classification field when available.
+
+Known or likely values:
+
+| post_raw | Likely Meaning |
+|---|---|
+| `L` | Local |
+| `S` | State |
+| `R` | Regional |
+| `N` | National |
+| TBD | Virtual |
+
+Do not assume all values are known yet. Store both `post_raw` and any descriptive field such as `post`.
+
+### Test match filtering
+
+The match discovery layer should filter obvious test or non-production matches.
+
+Initial exclusion rules:
+
+- Exclude names containing `test`.
+- Exclude names containing `practice`.
+- Exclude names containing `demo`.
+- Exclude names containing `sample`.
+- Exclude names containing `copy`.
+- Exclude names containing `do not use`.
+
+There should also be a manual exclusion list, for example:
+
+```text
+config/excluded_matches.json
+```
+
+Example known exclusion:
+
+```json
+{
+  "excluded_match_ids": [49],
+  "notes": {
+    "49": "Known test/schedule match; do not use for reporting"
+  }
+}
+```
+
+Example schedule/test endpoint to avoid as production reporting input:
+
+```text
+https://virtual.sssfonline.com/api/shot/sasp-schedule/49
+```
+
+## Slots endpoint
 
 ```text
 https://virtual.sssfonline.com/api/shot/SASP/competitions/{match_id}/slots
@@ -58,7 +160,7 @@ Important scoring note:
 
 A zero in `spp*_tot*` normally represents the dropped string for that stage. It should not be treated as a zero-second string.
 
-### Leaderboard endpoint
+## Leaderboard endpoint
 
 ```text
 https://virtual.sssfonline.com/api/shot/sasp-leaderboard/{match_id}
@@ -106,32 +208,58 @@ Validated paths from prior analysis:
 | Squad score | `teams[].score` |
 | Squad athletes | `teams[].athletes[]` |
 
-### Competition list endpoint
+## Schedule endpoint
 
 ```text
-https://virtual.sssfonline.com/api/shot/SASP/competitions?type=S&page=1
+https://virtual.sssfonline.com/api/shot/sasp-schedule/{match_id}
+```
+
+Example:
+
+```text
+https://virtual.sssfonline.com/api/shot/sasp-schedule/664
 ```
 
 Primary use:
 
-- Discover available matches
-- Build historical datasets
-- Identify current and prior Nationals match IDs
+- Match schedule metadata
+- Bays / locations
+- Timing
+- Match notes
+- Possible stage names or stage notes
+
+Caution:
+
+Match directors are often time-limited, and stage names or taxonomy fields may be incomplete or incorrect. Stage information may be updated in match notes instead of taxonomy fields.
+
+Preferred stage-name priority:
+
+1. Leaderboard stage names when available.
+2. Match notes or schedule notes when clearly more accurate.
+3. Slots `spp1` through `spp4` structural codes as fallback.
 
 ## Recommended ingestion pattern
 
-1. Fetch API JSON.
-2. Save raw snapshots under `data/raw/{match_id}/`.
-3. Parse into normalized tables under `data/processed/{match_id}/`.
-4. Build reports under `output/{match_id}/`.
+1. Fetch competition list pages.
+2. Save raw competition list snapshots.
+3. Build `match_index.csv`.
+4. Apply automatic and manual test-match exclusions.
+5. Fetch selected match raw snapshots.
+6. Parse into normalized tables.
+7. Validate scores.
+8. Build report artifacts.
 
 ## Recommended raw snapshot files
 
 ```text
-data/raw/664/664_slots.json
-data/raw/664/664_leaderboard.json
-data/raw/671/671_slots.json
-data/raw/671/671_leaderboard.json
+output/discovery/raw/competitions_page_1.json
+output/discovery/tables/match_index.csv
+output/664/raw/664_slots.json
+output/664/raw/664_leaderboard.json
+output/664/raw/664_schedule.json
+output/671/raw/671_slots.json
+output/671/raw/671_leaderboard.json
+output/671/raw/671_schedule.json
 ```
 
 ## Known team/entity ID
