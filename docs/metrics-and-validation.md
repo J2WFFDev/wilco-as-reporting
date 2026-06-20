@@ -90,38 +90,59 @@ Do not include string number in the user-facing record view unless specifically 
 
 ## Competitive metrics
 
-### Podium Threshold
+Competitive benchmarks must be calculated within the correct cohort.
 
-Score needed to reach the final award position.
+For large matches such as Nationals:
 
-Examples:
+- Individual HOA benchmarks should use Discipline plus Class.
+- Gender-context benchmarks should use Discipline plus Class plus Gender where the board exists.
+- Squad benchmarks should use Discipline plus Division.
+- Overall discipline boards are useful comparison cohorts, but should not be treated as the award cohort.
 
-- 1st place threshold
-- 3rd place threshold
-- Top 5 threshold
-- Top 10 threshold
+### Core benchmarks
+
+Always calculate these where data exists:
+
+| Metric | Meaning |
+|---|---|
+| Winner Threshold | First-place score in the correct cohort |
+| Award Threshold | Score of the final awarded place in the correct cohort |
+| Field Median | Median score of the full cohort |
+
+### Optional cohort-size benchmarks
+
+Do not hard-code Top 1 / Top 3 / Top 5 / Top 10 as universal metrics. Use optional benchmarks only when the field is large enough.
+
+| Cohort Size | Optional Benchmark |
+|---:|---|
+| 30 or more competitors | Top 10 Benchmark |
+| 75 or more competitors | Top 25 Benchmark |
 
 ### Gap to Podium
 
-Athlete Score minus Podium Threshold.
+Athlete Score minus Award Threshold.
 
 ### Gap to Winner
 
-Athlete Score minus Winner Score.
+Athlete Score minus Winner Threshold.
 
 ### Compression Index
 
-Top 10 median minus winner score.
+Preferred compression metrics:
 
-Small value means a highly compressed elite field.
+- Winner to Award Gap
+- Award to Median Gap
+- Winner to Median Gap
+
+Small values indicate a compressed, competitive field.
 
 ### Nationals Difficulty Index
 
-Year-over-year comparison of elite score thresholds by discipline.
+Year-over-year comparison of Winner Threshold, Award Threshold, and Field Median by discipline and award cohort.
 
 ### Improvement Velocity
 
-Year-over-year improvement of top competitor groups.
+Year-over-year movement in Winner Threshold, Award Threshold, and Field Median.
 
 ### Stage Difficulty Index
 
@@ -129,7 +150,7 @@ Field median stage score by stage.
 
 ### Stage Separation Index
 
-Field median minus top 10 median by stage.
+Field Median minus elite cohort benchmark by stage. The elite cohort should be selected based on cohort size, not hard-coded.
 
 ### Clutch Index
 
@@ -139,7 +160,7 @@ Negative value means athlete performed faster than their season average.
 
 ### Seconds to Championship
 
-Wilco Top 4 Avg compared to national elite Top 4 Avg or championship threshold.
+Wilco Top 4 Avg compared to the correct championship benchmark for the cohort.
 
 ## Suggested output tables
 
