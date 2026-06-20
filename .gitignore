@@ -23,6 +23,7 @@ data/processed/
 *.csv
 *.zip
 !config/match_overrides.csv
+!config/watched_matches.csv
 
 # OS / editors
 .DS_Store

@@ -101,6 +101,10 @@ repeated refresh while registration and results are changing during the
 event. Refreshing raw snapshots does not replace the later parsing,
 validation, or reporting phases.
 
+Watched-match selection, recent-match refresh rules, change detection, and the
+future refresh manifest are defined in
+[`refresh-strategy.md`](./refresh-strategy.md).
+
 ## First implementation target
 
 Match ID `664` should be used as the first test case.

@@ -1,0 +1,3 @@
+match_id,label,reason,active,default_include_schedule,refresh_priority,notes
+671,2026 SASP National Championships,Nationals monitoring target,true,true,high,Refresh repeatedly during Nationals
+664,2026 Texas State SASP Championship Match,Known completed validation match,false,true,normal,Use for parser validation
