@@ -187,6 +187,18 @@ snapshot, operations, and manifest outputs. Scheduled automation is not part
 of this phase. A match-and-team-scoped Actions cache carries only snapshots
 and manifest state forward so a later manual run can locate its predecessor.
 
+## Batch collection outputs
+
+Backfill and incremental refresh are orchestration layers, not new analytical
+packages. They produce plan, result, and error CSVs that explain which matches
+were selected, processed, skipped as unchanged, or failed.
+
+The **Backfill Matches** workflow uploads `backfill-report`. The
+**Incremental Refresh** workflow uploads `incremental-refresh-report`. Both
+include their planning/results CSVs, generated match output, and the runtime
+manifest with 14-day retention. Both workflows default to dry-run and have no
+scheduled trigger.
+
 Athlete Stage Matrix columns:
 
 - Athlete Name

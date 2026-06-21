@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Sequence
 
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
+from wilco_as_reporting.batch_refresh import (
+    BUILD_LEVELS,
+    BatchRefreshError,
+    run_backfill,
+    run_incremental_refresh,
+)
 from wilco_as_reporting.discovery import discover_matches
 from wilco_as_reporting.nationals_ops import NationalsOpsError
 from wilco_as_reporting.parsers import MatchParseError, parse_match
@@ -206,6 +213,76 @@ def build_nationals_pipeline_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fetch and save the match schedule snapshot.",
     )
+    return parser
+
+
+def build_backfill_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli backfill",
+        description="Plan or run a bounded historical match backfill.",
+    )
+    parser.add_argument("--match-ids", default="")
+    parser.add_argument("--from-date", type=date.fromisoformat)
+    parser.add_argument("--to-date", type=date.fromisoformat)
+    parser.add_argument("--post-types", default="")
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--include-schedule", action="store_true")
+    parser.add_argument("--max-matches", default=10, type=int)
+    parser.add_argument(
+        "--build-level",
+        choices=BUILD_LEVELS,
+        default="validate",
+    )
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--skip-unchanged",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--allow-over-max",
+        action="store_true",
+        help="Explicitly permit a selection larger than max-matches.",
+    )
+    return parser
+
+
+def build_incremental_refresh_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli incremental-refresh",
+        description="Plan or run watched, active, and recent refreshes.",
+    )
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--lookback-days", default=14, type=int)
+    parser.add_argument("--include-watched", action="store_true")
+    parser.add_argument(
+        "--include-recent",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--include-active",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument("--include-schedule", action="store_true")
+    parser.add_argument("--max-matches", default=25, type=int)
+    parser.add_argument(
+        "--build-level",
+        choices=BUILD_LEVELS,
+        default="team",
+    )
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--skip-unchanged",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--allow-over-max", action="store_true")
     return parser
 
 
@@ -559,6 +636,106 @@ def run_build_nationals(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_backfill_command(arguments: Sequence[str]) -> int:
+    args = build_backfill_parser().parse_args(arguments)
+    dry_run = args.dry_run or "--build-level" not in arguments
+    try:
+        profile = load_team_profile(args.team_key)
+        result = run_backfill(
+            output_root=args.output_dir,
+            profile=profile,
+            match_ids=_parse_integer_list(args.match_ids),
+            from_date=args.from_date,
+            to_date=args.to_date,
+            post_types=_parse_text_list(args.post_types),
+            build_level=args.build_level,
+            include_schedule=args.include_schedule,
+            max_matches=args.max_matches,
+            dry_run=dry_run,
+            overwrite=args.overwrite,
+            skip_unchanged=args.skip_unchanged,
+            allow_over_max=args.allow_over_max,
+        )
+    except (
+        BatchRefreshError,
+        SaspApiError,
+        TeamProfileError,
+        ValueError,
+    ) as exc:
+        print(f"Error: {exc}")
+        return 1
+    _print_batch_summary("backfill", result)
+    return 0 if result.failed_count == 0 else 1
+
+
+def run_incremental_refresh_command(
+    arguments: Sequence[str],
+) -> int:
+    args = build_incremental_refresh_parser().parse_args(arguments)
+    dry_run = args.dry_run or "--build-level" not in arguments
+    try:
+        profile = load_team_profile(args.team_key)
+        result = run_incremental_refresh(
+            output_root=args.output_dir,
+            profile=profile,
+            lookback_days=args.lookback_days,
+            include_watched=args.include_watched,
+            include_recent=args.include_recent,
+            include_active=args.include_active,
+            include_schedule=args.include_schedule,
+            max_matches=args.max_matches,
+            dry_run=dry_run,
+            build_level=args.build_level,
+            skip_unchanged=args.skip_unchanged,
+            overwrite=args.overwrite,
+            allow_over_max=args.allow_over_max,
+        )
+    except (
+        BatchRefreshError,
+        SaspApiError,
+        TeamProfileError,
+        ValueError,
+    ) as exc:
+        print(f"Error: {exc}")
+        return 1
+    _print_batch_summary("incremental refresh", result)
+    return 0 if result.failed_count == 0 else 1
+
+
+def _parse_integer_list(value: str) -> tuple[int, ...]:
+    if not value.strip():
+        return ()
+    try:
+        return tuple(
+            int(item.strip())
+            for item in value.split(",")
+            if item.strip()
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"Expected comma-separated integer match IDs: {value!r}"
+        ) from exc
+
+
+def _parse_text_list(value: str) -> tuple[str, ...]:
+    return tuple(
+        item.strip().upper()
+        for item in value.split(",")
+        if item.strip()
+    )
+
+
+def _print_batch_summary(label: str, result: object) -> None:
+    print(f"{label} dry run: {result.dry_run}")
+    print(f"selected matches: {result.selected_count}")
+    print(f"processed matches: {result.processed_count}")
+    print(f"skipped matches: {result.skipped_count}")
+    print(f"failed matches: {result.failed_count}")
+    print(f"plan/candidates: {result.plan_path}")
+    print(f"results: {result.results_path}")
+    print(f"errors: {result.errors_path}")
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     command_arguments = list(
         sys.argv[1:] if arguments is None else arguments
@@ -585,6 +762,13 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_build_team(command_arguments[1:])
     if command_arguments and command_arguments[0] == "build-nationals":
         return run_build_nationals(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "backfill":
+        return run_backfill_command(command_arguments[1:])
+    if (
+        command_arguments
+        and command_arguments[0] == "incremental-refresh"
+    ):
+        return run_incremental_refresh_command(command_arguments[1:])
     return run_fetch(command_arguments)
 
 

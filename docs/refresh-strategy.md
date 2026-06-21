@@ -72,19 +72,18 @@ Current columns:
 | `match_id` | SASP match identifier |
 | `team_key` | Team profile used for the operational run |
 | `match_name` | Current match name |
-| `run_timestamp` | Local time when the build ran |
-| `snapshot_label` | Operator label such as morning or final |
-| `snapshot_path` | Preserved artifact path |
+| `last_checked_at` | Most recent fetch/hash check |
+| `last_changed_at` | Most recent detected raw-data change |
+| `last_success_at` | Most recent successful requested build |
+| `last_status` | Success, failure, or unchanged-skip state |
+| `last_data_status` | `complete`, `partial`, `no_scores`, or other state |
 | `raw_slots_hash` | SHA-256 hash of slots JSON |
 | `raw_leaderboard_hash` | SHA-256 hash of leaderboard JSON |
 | `raw_schedule_hash` | SHA-256 hash of schedule JSON, when available |
 | `team_report_hash` | Combined hash of current team report tables |
-| `workbook_hash` | Hash of the current team workbook |
-| `athlete_count` | Team athletes in the current build |
-| `entry_count` | Team discipline entries in the current build |
-| `stage_row_count` | Team stage rows in the current build |
-| `validation_*_count` | Team ERROR, WARNING, and REVIEW counts |
-| `data_status` | `complete`, `partial`, `no_scores`, or other state |
+| `latest_snapshot_path` | Most recent Nationals snapshot, when created |
+| `latest_artifact_name` | Expected workflow artifact name, when relevant |
+| `validation_*_count` | ERROR, WARNING, and REVIEW counts from the latest build |
 | `notes` | Operator or processing notes |
 
 The manifest should be generated state under `output/`; it should not be
@@ -92,7 +91,7 @@ committed as source configuration.
 
 ## Candidate Selection Rules
 
-A future refresh selector should:
+The incremental refresh selector:
 
 1. Always refresh watched matches whose `active` value is true.
 2. Refresh discovered matches currently in progress.
@@ -102,8 +101,7 @@ A future refresh selector should:
 5. Skip matches marked `force_exclude` and matches identified as test,
    practice, demo, sample, copy, or do-not-use data.
 
-The exact recent-match window should be configurable when refresh automation
-is implemented.
+The recent-match window is controlled by `--lookback-days`.
 
 ## Change Detection
 
@@ -163,3 +161,81 @@ It restores only the selected match/team snapshot folder and runtime manifest
 from an Actions cache, then stores the new state for the next manual run. The
 full generated package is still uploaded as a normal downloadable artifact.
 No scheduled refresh automation is implemented yet.
+
+## Historical Backfill
+
+The guarded backfill command accepts explicit match IDs or catalog filters:
+
+```powershell
+python -m wilco_as_reporting.cli backfill --match-ids 628,664,671 --team-key wilco --output-dir output --include-schedule --dry-run
+```
+
+It writes:
+
+```text
+output/backfill/backfill_plan.csv
+output/backfill/backfill_results.csv
+output/backfill/backfill_errors.csv
+```
+
+Explicit IDs do not require a competition-list scan. When IDs are omitted,
+the command uses the effective discovery index and optional date/post filters.
+Force exclusions remain excluded. The recommended first set is Matches
+`628`, `664`, and `671`.
+
+## Incremental Refresh
+
+The incremental selector combines:
+
+- active watched matches;
+- matches currently between start and end dates;
+- matches ending within the lookback window; and
+- force-included matches.
+
+Force-excluded and test matches remain excluded. Candidate priority is
+watched, active, force-included, then recent. `--max-matches` safely caps the
+run and records the cap in candidate notes.
+
+```powershell
+python -m wilco_as_reporting.cli incremental-refresh --team-key wilco --output-dir output --lookback-days 14 --include-watched --include-schedule --dry-run
+```
+
+Outputs are:
+
+```text
+output/incremental/incremental_candidates.csv
+output/incremental/incremental_results.csv
+output/incremental/incremental_errors.csv
+```
+
+## Build Levels and Safety
+
+| Level | Work performed |
+| --- | --- |
+| `raw` | Fetch raw JSON only |
+| `parse` | Fetch and parse base tables |
+| `validate` | Parse and create validation tables |
+| `report` | Add full-match report CSVs |
+| `team` | Add team report CSVs; skip workbooks |
+| `nationals` | Run the full Nationals snapshot and workbook pipeline |
+
+Local commands default to dry-run when neither `--dry-run` nor an explicit
+`--build-level` is supplied. Manual workflows always default `dry_run` to
+true. A non-dry run should specify its build level and a reviewed
+`--max-matches` value.
+
+The manifest now stores one current state row per match/team. Every check
+updates `last_checked_at` and status. Successful changed data updates
+`last_changed_at`; successful processing updates `last_success_at`. Raw,
+schedule, and team-report hashes support `SKIPPED_UNCHANGED` results so stable
+historical matches do not repeatedly rebuild.
+
+Recommended operating sequence:
+
+1. Dry-run the selected backfill.
+2. Backfill a reviewed small match-ID set.
+3. Dry-run incremental selection.
+4. Refresh watched/recent candidates with a bounded maximum.
+
+Do not run an all-history import until dry-run results are reviewed. Scheduled
+automation is still intentionally excluded.

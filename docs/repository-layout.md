@@ -14,7 +14,9 @@ wilco-as-reporting/
 │       ├── refresh-match.yml
 │       ├── build-match-report.yml
 │       ├── build-team-match-report.yml
-│       └── build-nationals-ops.yml
+│       ├── build-nationals-ops.yml
+│       ├── backfill-matches.yml
+│       └── incremental-refresh.yml
 │
 ├── config/
 │   ├── match_overrides.csv
@@ -38,6 +40,8 @@ wilco-as-reporting/
 │       ├── discovery.py
 │       ├── pipeline.py
 │       ├── nationals_ops.py
+│       ├── batch_refresh.py
+│       ├── refresh_manifest.py
 │       ├── team_profiles.py
 │       ├── api/
 │       │   ├── __init__.py
@@ -120,6 +124,17 @@ Preserve timestamped team-build snapshots, append the runtime refresh
 manifest, compare the current team state with the previous snapshot, and
 build the Nationals change tables and daily brief.
 
+### `batch_refresh.py`
+
+Select bounded historical or watched/recent match sets, write dry-run plans,
+execute requested processing levels, record per-match results/errors, and
+skip unchanged heavy processing when hashes match.
+
+### `refresh_manifest.py`
+
+Own the canonical runtime manifest schema, migration from the earlier
+snapshot manifest, current-state upserts, and stable file/directory hashes.
+
 ### `team_profiles.py`
 
 Load tracked team identity, aliases, and activation metadata used by
@@ -154,6 +169,8 @@ python -m wilco_as_reporting.cli team-report --match-id 664 --output-dir output/
 python -m wilco_as_reporting.cli team-workbook --match-id 664 --output-dir output/664 --team-key wilco
 python -m wilco_as_reporting.cli build-team --match-id 664 --output-dir output/664 --team-key wilco --include-schedule
 python -m wilco_as_reporting.cli build-nationals --match-id 671 --output-dir output/671 --team-key wilco --include-schedule --overwrite --snapshot-label manual
+python -m wilco_as_reporting.cli backfill --match-ids 628,664,671 --team-key wilco --output-dir output --include-schedule --dry-run
+python -m wilco_as_reporting.cli incremental-refresh --team-key wilco --output-dir output --lookback-days 14 --include-watched --include-schedule --dry-run
 ```
 
 ## Data flow

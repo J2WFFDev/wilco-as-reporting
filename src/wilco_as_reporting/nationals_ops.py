@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import re
 import shutil
 from dataclasses import dataclass
@@ -11,6 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from wilco_as_reporting.refresh_manifest import (
+    directory_hash,
+    file_hash,
+    update_manifest,
+)
 from wilco_as_reporting.team_profiles import TeamProfile
 
 CHANGE_SUMMARY_COLUMNS = (
@@ -122,28 +126,6 @@ DAILY_BRIEF_COLUMNS = (
     "related_athlete",
     "related_discipline",
     "related_squad",
-    "notes",
-)
-
-MANIFEST_COLUMNS = (
-    "match_id",
-    "team_key",
-    "match_name",
-    "run_timestamp",
-    "snapshot_label",
-    "snapshot_path",
-    "raw_slots_hash",
-    "raw_leaderboard_hash",
-    "raw_schedule_hash",
-    "team_report_hash",
-    "workbook_hash",
-    "athlete_count",
-    "entry_count",
-    "stage_row_count",
-    "validation_error_count",
-    "validation_warning_count",
-    "validation_review_count",
-    "data_status",
     "notes",
 )
 
@@ -422,30 +404,31 @@ def build_nationals_operations(
             + ", ".join(missing_hashes)
             + "."
         )
-    _append_manifest(
+    update_manifest(
         manifest_path,
         {
             "match_id": match_id,
             "team_key": profile.team_key,
             "match_name": current["match_name"],
-            "run_timestamp": run_time.isoformat(timespec="seconds"),
-            "snapshot_label": label,
-            "snapshot_path": str(snapshot_path),
+            "last_checked_at": run_time.isoformat(timespec="seconds"),
+            "last_changed_at": run_time.isoformat(timespec="seconds"),
+            "last_success_at": run_time.isoformat(timespec="seconds"),
+            "last_status": "SUCCESS",
+            "last_data_status": data_status,
             **hashes,
-            "athlete_count": _summary_integer(
-                current,
-                "athlete_count",
+            "latest_snapshot_path": str(snapshot_path),
+            "latest_artifact_name": (
+                f"nationals-{match_id}-{profile.team_key}-ops"
             ),
-            "entry_count": _summary_integer(
-                current,
-                "entry_count",
-            ),
-            "stage_row_count": len(current["stages"]),
             "validation_error_count": validation_counts["ERROR"],
             "validation_warning_count": validation_counts["WARNING"],
             "validation_review_count": validation_counts["REVIEW"],
-            "data_status": data_status,
-            "notes": " ".join(manifest_notes),
+            "notes": " ".join(
+                [
+                    f"Snapshot label: {label}.",
+                    *manifest_notes,
+                ]
+            ),
         },
     )
 
@@ -1208,57 +1191,18 @@ def _artifact_hashes(
     team_dir = (
         output_path / "team_report_tables" / profile.team_key
     )
-    workbook = (
-        output_path
-        / "workbooks"
-        / f"match_{match_id}_{profile.team_key}_report.xlsx"
-    )
     return {
-        "raw_slots_hash": _file_hash(
+        "raw_slots_hash": file_hash(
             raw_dir / f"{match_id}_slots.json"
         ),
-        "raw_leaderboard_hash": _file_hash(
+        "raw_leaderboard_hash": file_hash(
             raw_dir / f"{match_id}_leaderboard.json"
         ),
-        "raw_schedule_hash": _file_hash(
+        "raw_schedule_hash": file_hash(
             raw_dir / f"{match_id}_schedule.json"
         ),
-        "team_report_hash": _directory_hash(team_dir),
-        "workbook_hash": _file_hash(workbook),
+        "team_report_hash": directory_hash(team_dir),
     }
-
-
-def _append_manifest(path: Path, row: dict[str, Any]) -> None:
-    rows = _read_csv(path) if path.exists() else []
-    rows.append(row)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _write_csv(path, MANIFEST_COLUMNS, rows)
-
-
-def _file_hash(path: Path) -> str:
-    if not path.exists() or not path.is_file():
-        return ""
-    digest = hashlib.sha256()
-    try:
-        with path.open("rb") as source:
-            for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                digest.update(chunk)
-    except OSError:
-        return ""
-    return digest.hexdigest()
-
-
-def _directory_hash(path: Path) -> str:
-    if not path.exists():
-        return ""
-    digest = hashlib.sha256()
-    files = sorted(item for item in path.rglob("*") if item.is_file())
-    if not files:
-        return ""
-    for file_path in files:
-        digest.update(str(file_path.relative_to(path)).encode("utf-8"))
-        digest.update(file_path.read_bytes())
-    return digest.hexdigest()
 
 
 def _index_rows(

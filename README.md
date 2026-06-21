@@ -128,3 +128,32 @@ Nationals data is reported clearly and does not fail the build. The workflow
 restores the latest snapshot/manifest state from a match-and-team-scoped
 Actions cache so separate manual runs can compare safely. Scheduled automation
 is intentionally not included yet.
+
+## Historical backfill and incremental refresh
+
+Always review a dry-run plan first:
+
+```powershell
+python -m wilco_as_reporting.cli backfill --match-ids 628,664,671 --team-key wilco --output-dir output --include-schedule --dry-run
+python -m wilco_as_reporting.cli incremental-refresh --team-key wilco --output-dir output --lookback-days 14 --include-watched --include-schedule --dry-run
+```
+
+Then run a deliberately bounded build:
+
+```powershell
+python -m wilco_as_reporting.cli backfill --match-ids 628,664 --team-key wilco --output-dir output --include-schedule --build-level team --max-matches 2 --overwrite
+python -m wilco_as_reporting.cli incremental-refresh --team-key wilco --output-dir output --lookback-days 14 --include-watched --include-schedule --build-level team --max-matches 5 --overwrite
+```
+
+Omitting both `--dry-run` and an explicit `--build-level` produces a dry run.
+GitHub workflows default to dry-run regardless of build-level selection.
+`--max-matches` caps the selected set unless `--allow-over-max` is explicitly
+provided.
+
+Build levels are `raw`, `parse`, `validate`, `report`, `team`, and
+`nationals`. The `team` level creates report CSVs but intentionally skips
+workbooks; use `nationals` only when snapshots, comparisons, and operations
+workbooks are needed.
+
+The recommended first historical set is `628,664,671`. Do not import all
+history until the plan CSV has been reviewed.

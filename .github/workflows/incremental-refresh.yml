@@ -1,0 +1,129 @@
+name: Incremental Refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      team_key:
+        description: Configured team profile key
+        required: true
+        default: "wilco"
+        type: string
+      lookback_days:
+        description: Recently ended match window
+        required: true
+        default: "14"
+        type: string
+      max_matches:
+        description: Maximum matches permitted in this run
+        required: true
+        default: "25"
+        type: string
+      dry_run:
+        description: Plan only without fetching match data
+        required: true
+        default: true
+        type: boolean
+      build_level:
+        description: Highest processing layer to build
+        required: true
+        default: "team"
+        type: choice
+        options:
+          - raw
+          - parse
+          - validate
+          - report
+          - team
+          - nationals
+      include_watched:
+        description: Include active watched matches
+        required: true
+        default: true
+        type: boolean
+      include_schedule:
+        description: Include schedule snapshots
+        required: true
+        default: true
+        type: boolean
+      overwrite:
+        description: Refresh existing raw snapshots
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  incremental-refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Restore prior refresh state
+        uses: actions/cache@v4
+        with:
+          path: output
+          key: incremental-state-${{ inputs.team_key }}-${{ github.run_id }}
+          restore-keys: |
+            incremental-state-${{ inputs.team_key }}-
+            backfill-state-${{ inputs.team_key }}-
+
+      - name: Run guarded incremental refresh
+        env:
+          TEAM_KEY: ${{ inputs.team_key }}
+          LOOKBACK_DAYS: ${{ inputs.lookback_days }}
+          MAX_MATCHES: ${{ inputs.max_matches }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          BUILD_LEVEL: ${{ inputs.build_level }}
+          INCLUDE_WATCHED: ${{ inputs.include_watched }}
+          INCLUDE_SCHEDULE: ${{ inputs.include_schedule }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          PYTHONPATH: src
+        run: |
+          dry_run_arg=""
+          watched_arg=""
+          schedule_arg=""
+          overwrite_arg=""
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            dry_run_arg="--dry-run"
+          fi
+          if [[ "$INCLUDE_WATCHED" == "true" ]]; then
+            watched_arg="--include-watched"
+          fi
+          if [[ "$INCLUDE_SCHEDULE" == "true" ]]; then
+            schedule_arg="--include-schedule"
+          fi
+          if [[ "$OVERWRITE" == "true" ]]; then
+            overwrite_arg="--overwrite"
+          fi
+
+          python -m wilco_as_reporting.cli incremental-refresh \
+            --team-key "$TEAM_KEY" \
+            --output-dir output \
+            --lookback-days "$LOOKBACK_DAYS" \
+            --max-matches "$MAX_MATCHES" \
+            --build-level "$BUILD_LEVEL" \
+            $dry_run_arg \
+            $watched_arg \
+            $schedule_arg \
+            $overwrite_arg
+
+      - name: Upload incremental refresh report
+        uses: actions/upload-artifact@v4
+        with:
+          name: incremental-refresh-report
+          path: output
+          retention-days: 14
