@@ -27,6 +27,10 @@ from wilco_as_reporting.raw_downloader import (
     RawDownloadError,
     download_raw_matches,
 )
+from wilco_as_reporting.raw_inventory import (
+    RawInventoryError,
+    build_raw_inventory,
+)
 from wilco_as_reporting.reports import (
     MatchReportError,
     TeamReportError,
@@ -316,6 +320,19 @@ def build_download_raw_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--max-matches", default=25, type=int)
+    return parser
+
+
+def build_raw_status_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli raw-status",
+        description="Inventory local raw JSON without making API calls.",
+    )
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--match-index", type=Path)
+    parser.add_argument("--match-ids", default="")
+    parser.add_argument("--require-schedule", action="store_true")
+    parser.add_argument("--team-key", default="")
     return parser
 
 
@@ -775,6 +792,34 @@ def run_download_raw(arguments: Sequence[str]) -> int:
     return 0 if result.failed_count == 0 else 1
 
 
+def run_raw_status(arguments: Sequence[str]) -> int:
+    args = build_raw_status_parser().parse_args(arguments)
+    try:
+        result = build_raw_inventory(
+            output_root=args.output_dir,
+            match_index=args.match_index,
+            match_ids=_parse_integer_list(args.match_ids),
+            require_schedule=args.require_schedule,
+            team_key=args.team_key,
+        )
+    except (RawInventoryError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"total matches checked: {result.total_matches}")
+    print(f"core complete: {result.core_complete_count}")
+    print(f"missing slots: {result.missing_slots_count}")
+    print(
+        "missing leaderboard: "
+        f"{result.missing_leaderboard_count}"
+    )
+    print(f"missing schedule: {result.missing_schedule_count}")
+    print(f"local inventory: {result.local_inventory_path}")
+    print(f"coverage: {result.coverage_path}")
+    print(f"missing core JSON: {result.missing_path}")
+    print(f"summary: {result.summary_path}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -844,6 +889,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_incremental_refresh_command(command_arguments[1:])
     if command_arguments and command_arguments[0] == "download-raw":
         return run_download_raw(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "raw-status":
+        return run_raw_status(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
