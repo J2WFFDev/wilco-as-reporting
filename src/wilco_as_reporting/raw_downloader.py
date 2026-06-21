@@ -13,6 +13,10 @@ from typing import Any, Callable, Iterable
 import requests
 
 from wilco_as_reporting.api.sasp_client import SaspClient
+from wilco_as_reporting.raw_content import (
+    classify_json_value,
+    inspect_json_file,
+)
 
 DOWNLOAD_PLAN_COLUMNS = (
     "match_id",
@@ -62,8 +66,10 @@ class RawDownloadResult:
     results_path: Path
     errors_path: Path
     planned_count: int
-    downloaded_count: int
-    skipped_count: int
+    valid_download_count: int
+    no_content_download_count: int
+    skipped_valid_count: int
+    skipped_no_content_count: int
     failed_count: int
     dry_run: bool
 
@@ -182,8 +188,10 @@ def download_raw_matches(
             results_path=results_path,
             errors_path=errors_path,
             planned_count=len(plan_rows),
-            downloaded_count=0,
-            skipped_count=0,
+            valid_download_count=0,
+            no_content_download_count=0,
+            skipped_valid_count=0,
+            skipped_no_content_count=0,
             failed_count=0,
             dry_run=True,
         )
@@ -202,17 +210,37 @@ def download_raw_matches(
         destination = Path(str(plan["output_path"]))
         prefix = f"[{number}/{total}] Match {match_id} {endpoint_type}"
         if plan["planned_action"] == "skip_existing":
-            progress(f"{prefix}: skipped existing file")
+            content = inspect_json_file(destination)
+            status = (
+                "SKIPPED_EXISTING_VALID"
+                if content.useful_content
+                else "SKIPPED_EXISTING_NO_CONTENT"
+            )
+            progress(
+                f"{prefix}: "
+                + (
+                    "skipped existing useful JSON"
+                    if content.useful_content
+                    else (
+                        "skipped existing file with no useful content "
+                        f"({content.issue_type})"
+                    )
+                )
+            )
             result_rows.append(
                 _result_row(
                     plan,
-                    status="SKIPPED_EXISTING",
+                    status=status,
                     downloaded=False,
                     skipped_existing=True,
                     http_status="",
                     retries=0,
                     elapsed=0.0,
-                    notes="Existing file preserved.",
+                    notes=(
+                        "Existing useful JSON preserved."
+                        if content.useful_content
+                        else content.content_issue
+                    ),
                 )
             )
             continue
@@ -236,6 +264,22 @@ def download_raw_matches(
             )
         if error:
             error_rows.append(error)
+            result_rows.append(
+                _result_row(
+                    plan,
+                    status="FAILED",
+                    downloaded=False,
+                    skipped_existing=False,
+                    http_status=error.get("http_status", ""),
+                    retries=int(error["retry_count"]),
+                    elapsed=round(
+                        time.monotonic()
+                        - float(error["started_at"]),
+                        3,
+                    ),
+                    notes=str(error["error_message"]),
+                )
+            )
             progress(
                 f"{prefix}: failed after "
                 f"{error['retry_count']} retry attempt(s)"
@@ -248,11 +292,21 @@ def download_raw_matches(
         results_path=results_path,
         errors_path=errors_path,
         planned_count=len(plan_rows),
-        downloaded_count=sum(
-            row["downloaded"] == "true" for row in result_rows
+        valid_download_count=sum(
+            row["status"] == "DOWNLOADED_VALID"
+            for row in result_rows
         ),
-        skipped_count=sum(
-            row["skipped_existing"] == "true" for row in result_rows
+        no_content_download_count=sum(
+            row["status"] == "DOWNLOADED_NO_CONTENT"
+            for row in result_rows
+        ),
+        skipped_valid_count=sum(
+            row["status"] == "SKIPPED_EXISTING_VALID"
+            for row in result_rows
+        ),
+        skipped_no_content_count=sum(
+            row["status"] == "SKIPPED_EXISTING_NO_CONTENT"
+            for row in result_rows
         ),
         failed_count=len(error_rows),
         dry_run=False,
@@ -348,11 +402,21 @@ def _download_one(
                     f"Endpoint returned invalid JSON: {exc}"
                 ) from exc
             _write_json(destination, payload)
+            content = classify_json_value(
+                payload,
+                file_exists=True,
+                file_size_bytes=destination.stat().st_size,
+            )
+            status = (
+                "DOWNLOADED_VALID"
+                if content.useful_content
+                else "DOWNLOADED_NO_CONTENT"
+            )
             return (
                 {
                     "match_id": match_id,
                     "endpoint_type": endpoint_type,
-                    "status": "DOWNLOADED",
+                    "status": status,
                     "output_path": str(destination),
                     "downloaded": "true",
                     "skipped_existing": "false",
@@ -362,7 +426,7 @@ def _download_one(
                         time.monotonic() - started,
                         3,
                     ),
-                    "notes": "",
+                    "notes": content.content_issue,
                 },
                 None,
             )
@@ -387,6 +451,8 @@ def _download_one(
                     "error_type": type(exc).__name__,
                     "error_message": str(exc),
                     "retry_count": attempt,
+                    "http_status": last_status,
+                    "started_at": started,
                     "notes": (
                         f"Last HTTP status: {last_status}."
                         if last_status != ""

@@ -783,8 +783,16 @@ def run_download_raw(arguments: Sequence[str]) -> int:
         return 1
     print(f"download dry run: {result.dry_run}")
     print(f"planned endpoints: {result.planned_count}")
-    print(f"downloaded endpoints: {result.downloaded_count}")
-    print(f"skipped existing endpoints: {result.skipped_count}")
+    print(f"valid downloads: {result.valid_download_count}")
+    print(
+        "no-content downloads: "
+        f"{result.no_content_download_count}"
+    )
+    print(f"skipped valid: {result.skipped_valid_count}")
+    print(
+        "skipped no-content: "
+        f"{result.skipped_no_content_count}"
+    )
     print(f"failed endpoints: {result.failed_count}")
     print(f"download plan: {result.plan_path}")
     print(f"download results: {result.results_path}")
@@ -806,16 +814,16 @@ def run_raw_status(arguments: Sequence[str]) -> int:
         print(f"Error: {exc}")
         return 1
     print(f"total matches checked: {result.total_matches}")
-    print(f"core complete: {result.core_complete_count}")
-    print(f"missing slots: {result.missing_slots_count}")
-    print(
-        "missing leaderboard: "
-        f"{result.missing_leaderboard_count}"
-    )
-    print(f"missing schedule: {result.missing_schedule_count}")
+    print(f"total files checked: {result.total_files}")
+    print(f"useful files: {result.useful_files_count}")
+    print(f"no-content files: {result.no_content_files_count}")
+    print(f"invalid files: {result.invalid_files_count}")
+    print(f"core complete matches: {result.core_complete_count}")
+    print(f"incomplete matches: {result.incomplete_match_count}")
     print(f"local inventory: {result.local_inventory_path}")
     print(f"coverage: {result.coverage_path}")
     print(f"missing core JSON: {result.missing_path}")
+    print(f"content issues: {result.content_issues_path}")
     print(f"summary: {result.summary_path}")
     return 0
 
