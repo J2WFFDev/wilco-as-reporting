@@ -23,6 +23,10 @@ from wilco_as_reporting.pipeline import (
     build_single_match,
     build_team_match,
 )
+from wilco_as_reporting.raw_downloader import (
+    RawDownloadError,
+    download_raw_matches,
+)
 from wilco_as_reporting.reports import (
     MatchReportError,
     TeamReportError,
@@ -283,6 +287,35 @@ def build_incremental_refresh_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--allow-over-max", action="store_true")
+    return parser
+
+
+def build_download_raw_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli download-raw",
+        description=(
+            "Download raw SASP JSON with conservative desktop pacing."
+        ),
+    )
+    parser.add_argument("--match-ids", required=True)
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--include-schedule", action="store_true")
+    parser.add_argument(
+        "--skip-existing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--requests-per-window", default=4, type=int)
+    parser.add_argument("--window-seconds", default=30.0, type=float)
+    parser.add_argument("--retry-count", default=3, type=int)
+    parser.add_argument(
+        "--retry-backoff-seconds",
+        default=30.0,
+        type=float,
+    )
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--max-matches", default=25, type=int)
     return parser
 
 
@@ -702,6 +735,46 @@ def run_incremental_refresh_command(
     return 0 if result.failed_count == 0 else 1
 
 
+def run_download_raw(arguments: Sequence[str]) -> int:
+    args = build_download_raw_parser().parse_args(arguments)
+    print(
+        "rate limit: "
+        f"{args.requests_per_window} request(s) per "
+        f"{args.window_seconds:g} seconds"
+    )
+    print(
+        "retry policy: "
+        f"{args.retry_count} retry attempt(s), "
+        f"{args.retry_backoff_seconds:g}-second base backoff"
+    )
+    try:
+        result = download_raw_matches(
+            match_ids=_parse_integer_list(args.match_ids),
+            output_root=args.output_dir,
+            include_schedule=args.include_schedule,
+            skip_existing=args.skip_existing,
+            overwrite=args.overwrite,
+            requests_per_window=args.requests_per_window,
+            window_seconds=args.window_seconds,
+            retry_count=args.retry_count,
+            retry_backoff_seconds=args.retry_backoff_seconds,
+            dry_run=args.dry_run,
+            max_matches=args.max_matches,
+        )
+    except (RawDownloadError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"download dry run: {result.dry_run}")
+    print(f"planned endpoints: {result.planned_count}")
+    print(f"downloaded endpoints: {result.downloaded_count}")
+    print(f"skipped existing endpoints: {result.skipped_count}")
+    print(f"failed endpoints: {result.failed_count}")
+    print(f"download plan: {result.plan_path}")
+    print(f"download results: {result.results_path}")
+    print(f"download errors: {result.errors_path}")
+    return 0 if result.failed_count == 0 else 1
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -769,6 +842,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         and command_arguments[0] == "incremental-refresh"
     ):
         return run_incremental_refresh_command(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "download-raw":
+        return run_download_raw(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
