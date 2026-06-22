@@ -71,9 +71,9 @@ The active process is:
 7. Generate reports and artifacts
 ```
 
-## API foundation phases
+## API foundation history
 
-Before parsing begins, the API foundation should be completed in small steps:
+The API foundation was completed in these small steps:
 
 ```text
 Phase 2A.1 — API fetch and raw snapshots
@@ -102,17 +102,17 @@ event. Refreshing raw snapshots does not replace the later parsing,
 validation, or reporting phases.
 
 Watched-match selection, recent-match refresh rules, change detection, and the
-future refresh manifest are defined in
+implemented refresh manifest are defined in
 [`refresh-strategy.md`](./refresh-strategy.md).
 
-## First implementation target
+## Validation baseline
 
-Match ID `664` should be used as the first test case.
+Match ID `664` remains the completed validation baseline.
 
-Minimum useful parsing outputs after the API foundation is proven:
+Its base parsing outputs are:
 
 - `match_scores.csv`
 - `rankings.csv`
 - `squad_results.csv`
 
-After those are correct, add validation and workbook generation.
+Validation, report tables, and workbook generation build on those tables.

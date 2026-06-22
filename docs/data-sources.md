@@ -18,13 +18,16 @@ The intended data process is:
 7. Generate reports and artifacts
 ```
 
-The API foundation should be built in three small pieces before parsing begins:
+The implemented API foundation was delivered in three small pieces:
 
 ```text
 Phase 2A.1 — API fetch and raw snapshots
 Phase 2A.2 — GitHub Actions runner
 Phase 2A.3 — Match discovery and match index
 ```
+
+Parsing, validation, reporting, historical backfill, and selective refresh now
+build on this foundation.
 
 ## Match discovery endpoint
 

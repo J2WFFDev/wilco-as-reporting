@@ -11,7 +11,7 @@ python -m wilco_as_reporting.cli report --match-id 664 --output-dir output/664
 
 The command writes `output/<match_id>/report_tables/` with team, athlete,
 award, squad, stage-performance, validation-rollup, and coach-review tables.
-These tables provide a stable input layer for a future Excel workbook.
+These tables provide the stable input layer for workbook generation.
 
 The report table layer does not create highlights, historical analytics, or
 Excel files. Workbook generation should consume these report-ready tables only

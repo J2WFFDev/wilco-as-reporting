@@ -14,11 +14,10 @@ and keeps attention on matches whose data may still change.
 
 ### One-Time Bulk Import
 
-A future bulk import will acquire selected historical matches once to create a
-baseline dataset. It should use the curated match index, respect forced
-exclusions, and avoid repeatedly downloading stable history.
-
-Bulk import is not part of the current implementation.
+The implemented `backfill` command acquires a deliberately bounded historical
+set to create or refresh the baseline. It uses explicit match selection or the
+curated match index, respects exclusions, supports dry-run planning, and can
+skip unchanged data.
 
 ### Watched Match Refresh
 
@@ -31,10 +30,10 @@ use but should not be refreshed automatically.
 
 ### Recent Active Match Refresh
 
-A future refresh process may select matches from the effective match index
-when their dates indicate that they are in progress or recently completed.
-This catches active events without requiring every match to be listed in the
-watchlist.
+The implemented `incremental-refresh` command can select matches from the
+effective match index when their dates indicate that they are active or
+recently completed. This catches active events without requiring every match
+to be listed in the watchlist.
 
 ### On-Demand Single Match Refresh
 
