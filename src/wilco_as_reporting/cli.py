@@ -22,6 +22,10 @@ from wilco_as_reporting.history_insights import (
     build_history_insights,
 )
 from wilco_as_reporting.nationals_ops import NationalsOpsError
+from wilco_as_reporting.nationals_packet import (
+    NationalsPacketError,
+    build_nationals_packet,
+)
 from wilco_as_reporting.nationals_readiness import (
     NationalsReadinessError,
     build_nationals_readiness,
@@ -441,6 +445,26 @@ def build_nationals_readiness_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--include-limited-history",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    return parser
+
+
+def build_nationals_packet_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli nationals-packet",
+        description="Build a concise private Nationals coach packet.",
+    )
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--match-id", default=671, type=int)
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--readiness-dir", type=Path)
+    parser.add_argument("--records-dir", type=Path)
+    parser.add_argument("--history-dir", type=Path)
+    parser.add_argument("--top-priorities", default=10, type=int)
+    parser.add_argument(
+        "--workbook",
         action=argparse.BooleanOptionalAction,
         default=True,
     )
@@ -1085,6 +1109,30 @@ def run_nationals_readiness(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_nationals_packet(arguments: Sequence[str]) -> int:
+    args = build_nationals_packet_parser().parse_args(arguments)
+    try:
+        result = build_nationals_packet(
+            output_root=args.output_dir,
+            team_key=args.team_key,
+            match_id=args.match_id,
+            readiness_dir=args.readiness_dir,
+            records_dir=args.records_dir,
+            history_dir=args.history_dir,
+            top_priorities=args.top_priorities,
+            workbook=args.workbook,
+        )
+    except (NationalsPacketError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    if result.workbook_path:
+        print(f"workbook: {result.workbook_path}")
+    print(f"coach packet output: {result.output_dir}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -1164,6 +1212,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_records_build(command_arguments[1:])
     if command_arguments and command_arguments[0] == "nationals-readiness":
         return run_nationals_readiness(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "nationals-packet":
+        return run_nationals_packet(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
