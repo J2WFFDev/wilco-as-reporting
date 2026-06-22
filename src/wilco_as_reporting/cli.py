@@ -36,6 +36,7 @@ from wilco_as_reporting.raw_inventory import (
     RawInventoryError,
     build_raw_inventory,
 )
+from wilco_as_reporting.records import RecordsBuildError, build_records
 from wilco_as_reporting.reports import (
     MatchReportError,
     TeamReportError,
@@ -387,6 +388,28 @@ def build_history_insights_parser() -> argparse.ArgumentParser:
     parser.add_argument("--season")
     parser.add_argument("--min-scored-matches", default=2, type=int)
     parser.add_argument("--current-season-only", action="store_true")
+    parser.add_argument("--include-placeholders", action="store_true")
+    parser.add_argument(
+        "--workbook",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    return parser
+
+
+def build_records_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli records-build",
+        description="Build Wilco records and personal-record reports.",
+    )
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--records-dir", type=Path)
+    parser.add_argument("--history-dir", type=Path)
+    parser.add_argument("--match-id", type=int)
+    parser.add_argument("--match-ids", default="")
+    parser.add_argument("--match-ids-file", type=Path)
+    parser.add_argument("--season")
     parser.add_argument("--include-placeholders", action="store_true")
     parser.add_argument(
         "--workbook",
@@ -957,6 +980,37 @@ def run_history_insights(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_records_build(arguments: Sequence[str]) -> int:
+    args = build_records_parser().parse_args(arguments)
+    try:
+        result = build_records(
+            output_root=args.output_dir,
+            team_key=args.team_key,
+            records_dir=args.records_dir,
+            history_dir=args.history_dir,
+            match_id=args.match_id,
+            match_ids=_parse_integer_list(args.match_ids),
+            match_ids_file=args.match_ids_file,
+            season=args.season,
+            include_placeholders=args.include_placeholders,
+            workbook=args.workbook,
+        )
+    except (RecordsBuildError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    print(
+        "placeholder rows excluded: "
+        f"{result.placeholder_rows_excluded}"
+    )
+    print(f"no-score rows excluded: {result.no_score_rows_excluded}")
+    if result.workbook_path:
+        print(f"workbook: {result.workbook_path}")
+    print(f"records output: {result.records_dir}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -1032,6 +1086,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_history_build(command_arguments[1:])
     if command_arguments and command_arguments[0] == "history-insights":
         return run_history_insights(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "records-build":
+        return run_records_build(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
