@@ -16,6 +16,7 @@ from wilco_as_reporting.batch_refresh import (
     run_incremental_refresh,
 )
 from wilco_as_reporting.discovery import discover_matches
+from wilco_as_reporting.history import HistoryBuildError, build_history
 from wilco_as_reporting.nationals_ops import NationalsOpsError
 from wilco_as_reporting.parsers import MatchParseError, parse_match
 from wilco_as_reporting.pipeline import (
@@ -333,6 +334,41 @@ def build_raw_status_parser() -> argparse.ArgumentParser:
     parser.add_argument("--match-ids", default="")
     parser.add_argument("--require-schedule", action="store_true")
     parser.add_argument("--team-key", default="")
+    return parser
+
+
+def build_history_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli history-build",
+        description="Build Wilco historical analytics from local outputs.",
+    )
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--match-ids", default="")
+    parser.add_argument("--match-ids-file", type=Path)
+    parser.add_argument("--match-index", type=Path)
+    parser.add_argument("--backfill-results", type=Path)
+    parser.add_argument(
+        "--include-partial",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--include-no-scores",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--exclude-no-scores-from-performance",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument("--min-athlete-matches", default=2, type=int)
+    parser.add_argument(
+        "--workbook",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
     return parser
 
 
@@ -828,6 +864,48 @@ def run_raw_status(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_history_build(arguments: Sequence[str]) -> int:
+    args = build_history_parser().parse_args(arguments)
+    try:
+        profile = load_team_profile(args.team_key)
+        result = build_history(
+            output_root=args.output_dir,
+            profile=profile,
+            match_ids=_parse_integer_list(args.match_ids),
+            match_ids_file=args.match_ids_file,
+            match_index=args.match_index,
+            backfill_results=args.backfill_results,
+            include_partial=args.include_partial,
+            include_no_scores=args.include_no_scores,
+            exclude_no_scores_from_performance=(
+                args.exclude_no_scores_from_performance
+            ),
+            min_athlete_matches=args.min_athlete_matches,
+            workbook=args.workbook,
+        )
+    except (HistoryBuildError, TeamProfileError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"source matches: {result.source_matches}")
+    print(f"Wilco matches found: {result.wilco_matches}")
+    print(f"athletes found: {result.athletes}")
+    print(f"disciplines found: {result.disciplines}")
+    print(f"scored entries: {result.scored_entries}")
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    if result.workbook_path:
+        print(f"workbook: {result.workbook_path}")
+    for warning in result.warnings[:20]:
+        print(f"Warning: {warning}")
+    if len(result.warnings) > 20:
+        print(
+            f"Warning: {len(result.warnings) - 20} additional "
+            "input warnings omitted from console."
+        )
+    print(f"history output: {result.output_dir}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -899,6 +977,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_download_raw(command_arguments[1:])
     if command_arguments and command_arguments[0] == "raw-status":
         return run_raw_status(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "history-build":
+        return run_history_build(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
