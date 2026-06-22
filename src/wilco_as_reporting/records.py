@@ -3,15 +3,25 @@
 from __future__ import annotations
 
 import csv
+from difflib import SequenceMatcher
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from wilco_as_reporting.athlete_aliases import (
+    AthleteAliasError,
+    apply_athlete_aliases,
+    load_athlete_aliases,
+)
+
 SUMMARY_COLUMNS = ("metric", "value", "notes")
 ALL_TIME_COLUMNS = (
     "record_scope",
+    "record_title",
+    "display_group",
+    "display_order",
     "discipline",
     "athlete_name",
     "athlete_id",
@@ -45,7 +55,10 @@ SEASON_COLUMNS = (
 )
 PERSONAL_COLUMNS = (
     "athlete_name",
+    "canonical_athlete_name",
     "athlete_id",
+    "original_athlete_name_count",
+    "identity_resolution_note",
     "discipline",
     "personal_record_score",
     "personal_record_match_id",
@@ -62,6 +75,9 @@ PERSONAL_COLUMNS = (
     "matches_count",
     "scored_matches_count",
     "confidence_level",
+    "record_confidence",
+    "display_eligible",
+    "display_note",
     "notes",
 )
 PR_HISTORY_COLUMNS = (
@@ -86,11 +102,28 @@ NEW_PR_COLUMNS = (
     "athlete_name",
     "athlete_id",
     "discipline",
+    "pr_event_type",
     "new_pr_score",
     "previous_pr_score",
     "improvement_seconds",
     "improvement_percent",
     "notes",
+)
+HIGHLIGHT_COLUMNS = (
+    "match_id",
+    "match_name",
+    "match_date",
+    "season_label",
+    "athlete_name",
+    "discipline",
+    "pr_event_type",
+    "new_pr_score",
+    "previous_pr_score",
+    "improvement_seconds",
+    "improvement_percent",
+    "confidence_level",
+    "display_eligible",
+    "display_note",
 )
 MATCH_BEST_COLUMNS = (
     "match_id",
@@ -131,6 +164,16 @@ QUALITY_COLUMNS = (
     "severity",
     "notes",
 )
+IDENTITY_CANDIDATE_COLUMNS = (
+    "candidate_type",
+    "name_a",
+    "athlete_id_a",
+    "name_b",
+    "athlete_id_b",
+    "similarity_note",
+    "recommended_action",
+    "notes",
+)
 
 OUTPUTS = (
     ("records_summary.csv", SUMMARY_COLUMNS),
@@ -139,8 +182,10 @@ OUTPUTS = (
     ("personal_records.csv", PERSONAL_COLUMNS),
     ("personal_record_history.csv", PR_HISTORY_COLUMNS),
     ("new_personal_records_by_match.csv", NEW_PR_COLUMNS),
+    ("recent_pr_highlights.csv", HIGHLIGHT_COLUMNS),
     ("match_bests.csv", MATCH_BEST_COLUMNS),
     ("stage_benchmarks.csv", STAGE_COLUMNS),
+    ("records_identity_candidates.csv", IDENTITY_CANDIDATE_COLUMNS),
     ("records_data_quality.csv", QUALITY_COLUMNS),
 )
 
@@ -159,6 +204,10 @@ class RecordsBuildResult:
     row_counts: dict[str, int]
     placeholder_rows_excluded: int
     no_score_rows_excluded: int
+    identity_candidates: int
+    initial_pr_count: int
+    improved_pr_count: int
+    display_ineligible_count: int
 
 
 def build_records(
@@ -180,14 +229,20 @@ def build_records(
     root = Path(output_root)
     history = Path(history_dir) if history_dir else root / "history"
     target = Path(records_dir) if records_dir else root / "records"
-    participation = _read_required(
+    participation_raw = _read_required(
         history / "wilco_match_participation.csv"
     )
+    try:
+        aliases = load_athlete_aliases()
+    except AthleteAliasError as exc:
+        raise RecordsBuildError(str(exc)) from exc
+    participation = apply_athlete_aliases(participation_raw, aliases)
     source_matches = _read_required(
         history / "history_source_matches.csv"
     )
-    stage_history = _read_required(
-        history / "wilco_stage_benchmark_history.csv"
+    stage_history = apply_athlete_aliases(
+        _read_required(history / "wilco_stage_benchmark_history.csv"),
+        aliases,
     )
     selected_ids = _selected_match_ids(
         match_id,
@@ -221,9 +276,21 @@ def build_records(
             and _number(row.get("score")) is not None
         )
     ]
+    identity_candidates = _identity_candidates(
+        scoped_participation,
+        aliases,
+    )
     all_time = _all_time_records(scores)
     season_records = _season_records(scores)
     personal, pr_history, new_prs = _personal_records(scores)
+    highlights = _recent_pr_highlights(new_prs)
+    for row in new_prs:
+        for internal_column in (
+            "_scored_entries",
+            "_data_status",
+            "_score_median",
+        ):
+            row.pop(internal_column, None)
     match_bests = _match_bests(scores)
     stage_benchmarks, missing_stage_rows = _stage_benchmarks(
         stage_history,
@@ -241,6 +308,8 @@ def build_records(
         season_records,
         match_bests,
         missing_stage_rows,
+        identity_candidates,
+        highlights,
     )
     summary = _summary_rows(
         scoped_sources,
@@ -261,8 +330,10 @@ def build_records(
         "personal_records.csv": personal,
         "personal_record_history.csv": pr_history,
         "new_personal_records_by_match.csv": new_prs,
+        "recent_pr_highlights.csv": highlights,
         "match_bests.csv": match_bests,
         "stage_benchmarks.csv": stage_benchmarks,
+        "records_identity_candidates.csv": identity_candidates,
         "records_data_quality.csv": quality,
     }
     for filename, columns in OUTPUTS:
@@ -283,6 +354,16 @@ def build_records(
             placeholder_count if not include_placeholders else 0
         ),
         no_score_rows_excluded=no_score_count,
+        identity_candidates=len(identity_candidates),
+        initial_pr_count=sum(
+            row["pr_event_type"] == "initial_pr" for row in new_prs
+        ),
+        improved_pr_count=sum(
+            row["pr_event_type"] == "improved_pr" for row in new_prs
+        ),
+        display_ineligible_count=sum(
+            row["display_eligible"] == "false" for row in highlights
+        ),
     )
 
 
@@ -310,6 +391,23 @@ def _all_time_records(
         ),
     )
     results: list[dict[str, Any]] = []
+    display = {
+        "wilco_all_time_discipline": (
+            "Wilco All-Time Discipline Record",
+            "Discipline Records",
+            1,
+        ),
+        "wilco_all_time_discipline_class": (
+            "Wilco All-Time Class Record",
+            "Class Records",
+            2,
+        ),
+        "wilco_all_time_discipline_division": (
+            "Wilco All-Time Division Record",
+            "Division Records",
+            3,
+        ),
+    }
     for scope, key_function in specifications:
         grouped = _group_nonblank(scores, key_function)
         for rows in grouped.values():
@@ -317,6 +415,9 @@ def _all_time_records(
                 results.append(
                     {
                         "record_scope": scope,
+                        "record_title": display[scope][0],
+                        "display_group": display[scope][1],
+                        "display_order": display[scope][2],
                         "discipline": row.get("discipline", ""),
                         "athlete_name": row.get("athlete_name", ""),
                         "athlete_id": row.get("athlete_id", ""),
@@ -404,6 +505,24 @@ def _personal_records(
     new_prs: list[dict[str, Any]] = []
     for key, rows in grouped.items():
         ordered = sorted(rows, key=_chronology_key)
+        match_count = len({row.get("match_id", "") for row in ordered})
+        score_values = [
+            value
+            for value in (_number(row.get("score")) for row in ordered)
+            if value is not None
+        ]
+        original_names = {
+            row.get("original_athlete_name", "")
+            for row in ordered
+            if row.get("original_athlete_name")
+        }
+        resolution_notes = {
+            row.get("identity_resolution_note", "")
+            for row in ordered
+            if row.get("identity_resolution_note")
+            and row.get("identity_resolution_note")
+            != "No alias mapping applied."
+        }
         current_pr: float | None = None
         for row in ordered:
             score = _number(row.get("score"))
@@ -441,6 +560,9 @@ def _personal_records(
                 }
             )
             if is_new:
+                event_type = (
+                    "initial_pr" if previous is None else "improved_pr"
+                )
                 percent = (
                     improvement / previous * 100
                     if improvement is not None and previous
@@ -455,15 +577,20 @@ def _personal_records(
                         "athlete_name": key[0],
                         "athlete_id": key[1],
                         "discipline": key[2],
+                        "pr_event_type": event_type,
                         "new_pr_score": _display(score),
                         "previous_pr_score": _display(previous),
                         "improvement_seconds": _display(improvement),
                         "improvement_percent": _display(percent),
                         "notes": (
-                            "Initial known personal record."
-                            if previous is None
-                            else "New internal personal record."
+                            "Initial known personal record; no prior PR "
+                            "was beaten."
+                            if event_type == "initial_pr"
+                            else "Improved internal personal record."
                         ),
+                        "_scored_entries": match_count,
+                        "_data_status": row.get("data_status", ""),
+                        "_score_median": _median(score_values),
                     }
                 )
                 current_pr = score
@@ -481,7 +608,7 @@ def _personal_records(
             if latest_score is not None
             else None
         )
-        count = len({row.get("match_id", "") for row in ordered})
+        count = match_count
         note = (
             "Current PR."
             if distance is not None and abs(distance) <= TOLERANCE
@@ -489,10 +616,23 @@ def _personal_records(
         )
         if count == 1:
             note += " Limited history: one scored match."
+        confidence, display_eligible, display_note = _personal_confidence(
+            count,
+            best_score,
+            _median(score_values),
+            any(row.get("data_status") == "partial" for row in ordered),
+        )
         personal.append(
             {
                 "athlete_name": key[0],
+                "canonical_athlete_name": key[0],
                 "athlete_id": key[1],
+                "original_athlete_name_count": len(original_names),
+                "identity_resolution_note": (
+                    " ".join(sorted(resolution_notes))
+                    if resolution_notes
+                    else "No alias mapping applied."
+                ),
                 "discipline": key[2],
                 "personal_record_score": _display(best_score),
                 "personal_record_match_id": best.get("match_id", ""),
@@ -515,7 +655,10 @@ def _personal_records(
                 ),
                 "matches_count": count,
                 "scored_matches_count": count,
-                "confidence_level": _count_confidence(count),
+                "confidence_level": confidence,
+                "record_confidence": confidence,
+                "display_eligible": _boolean(display_eligible),
+                "display_note": display_note,
                 "notes": note,
             }
         )
@@ -542,6 +685,74 @@ def _personal_records(
         )
     )
     return personal, history, new_prs
+
+
+def _recent_pr_highlights(
+    new_prs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    highlights: list[dict[str, Any]] = []
+    for row in new_prs:
+        event_type = row["pr_event_type"]
+        score = _number(row.get("new_pr_score")) or 0
+        median = _number(row.get("_score_median"))
+        count = _integer(row.get("_scored_entries"))
+        partial = row.get("_data_status") == "partial"
+        outlier = score > 150 or (
+            median is not None and median > 0 and score > median * 2
+        )
+        if event_type == "initial_pr":
+            confidence = "low"
+            eligible = False
+            display_note = (
+                "Initial baseline PR; do not describe as beating a prior PR."
+            )
+        elif partial or outlier:
+            confidence = "low"
+            eligible = False
+            display_note = (
+                "Valid PR event, but partial/noisy or outlier context "
+                "requires review."
+            )
+        elif count >= 3:
+            confidence = "high"
+            eligible = True
+            display_note = "Celebration-safe improved PR candidate."
+        elif count == 2:
+            confidence = "medium"
+            eligible = True
+            display_note = "Improved PR with two scored entries."
+        else:
+            confidence = "low"
+            eligible = False
+            display_note = "Limited history."
+        highlights.append(
+            {
+                "match_id": row["match_id"],
+                "match_name": row["match_name"],
+                "match_date": row["match_date"],
+                "season_label": row["season_label"],
+                "athlete_name": row["athlete_name"],
+                "discipline": row["discipline"],
+                "pr_event_type": event_type,
+                "new_pr_score": row["new_pr_score"],
+                "previous_pr_score": row["previous_pr_score"],
+                "improvement_seconds": row["improvement_seconds"],
+                "improvement_percent": row["improvement_percent"],
+                "confidence_level": confidence,
+                "display_eligible": _boolean(eligible),
+                "display_note": display_note,
+            }
+        )
+    return sorted(
+        highlights,
+        key=lambda row: (
+            row["match_date"],
+            _integer(row["match_id"]),
+            row["athlete_name"],
+            row["discipline"],
+        ),
+        reverse=True,
+    )
 
 
 def _match_bests(
@@ -721,6 +932,97 @@ def _stage_benchmarks(
     )
 
 
+def _identity_candidates(
+    rows: list[dict[str, Any]],
+    aliases: tuple[Any, ...],
+) -> list[dict[str, Any]]:
+    profiles: dict[tuple[str, str], dict[str, set[str]]] = {}
+    for row in rows:
+        name = row.get("original_athlete_name", "").strip()
+        athlete_id = row.get("athlete_id", "").strip()
+        if not name or athlete_id == PLACEHOLDER_ID:
+            continue
+        profile = profiles.setdefault(
+            (name, athlete_id),
+            {"disciplines": set(), "seasons": set()},
+        )
+        if row.get("discipline"):
+            profile["disciplines"].add(row["discipline"])
+        if row.get("season_label"):
+            profile["seasons"].add(row["season_label"])
+    resolved_pairs = {
+        (
+            alias.canonical_name.casefold(),
+            alias.alias_name.casefold(),
+        )
+        for alias in aliases
+    }
+    candidates: list[dict[str, Any]] = []
+    identities = sorted(profiles)
+    for index, identity_a in enumerate(identities):
+        for identity_b in identities[index + 1 :]:
+            name_a, id_a = identity_a
+            name_b, id_b = identity_b
+            similarity = SequenceMatcher(
+                None,
+                name_a.casefold(),
+                name_b.casefold(),
+            ).ratio()
+            discipline_overlap = (
+                profiles[identity_a]["disciplines"]
+                & profiles[identity_b]["disciplines"]
+            )
+            season_overlap = (
+                profiles[identity_a]["seasons"]
+                & profiles[identity_b]["seasons"]
+            )
+            alias_pair = (
+                (name_a.casefold(), name_b.casefold()) in resolved_pairs
+                or (name_b.casefold(), name_a.casefold()) in resolved_pairs
+            )
+            same_id = bool(id_a and id_b and id_a == id_b)
+            likely = same_id or (
+                similarity >= 0.88
+                and bool(discipline_overlap)
+                and bool(season_overlap)
+            )
+            if not likely:
+                continue
+            candidates.append(
+                {
+                    "candidate_type": (
+                        "resolved_alias"
+                        if alias_pair
+                        else (
+                            "same_athlete_id"
+                            if same_id
+                            else "similar_name_overlap"
+                        )
+                    ),
+                    "name_a": name_a,
+                    "athlete_id_a": id_a,
+                    "name_b": name_b,
+                    "athlete_id_b": id_b,
+                    "similarity_note": (
+                        f"Name similarity {similarity:.1%}; "
+                        f"{len(discipline_overlap)} overlapping discipline(s); "
+                        f"{len(season_overlap)} overlapping season(s)."
+                    ),
+                    "recommended_action": (
+                        "Alias mapping applied; periodically confirm identity."
+                        if alias_pair
+                        else "Review and add an alias only if identity matches."
+                    ),
+                    "notes": (
+                        "Matching athlete ID supports the candidate."
+                        if same_id
+                        else "Candidate is based on name and activity overlap."
+                    ),
+                }
+            )
+    return candidates
+
+
 def _quality_rows(
     placeholder_count: int,
     no_score_count: int,
@@ -730,12 +1032,32 @@ def _quality_rows(
     season_records: list[dict[str, Any]],
     match_bests: list[dict[str, Any]],
     missing_stage_rows: int,
+    identity_candidates: list[dict[str, Any]],
+    highlights: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     tied = sum(
         _integer(row.get("tie_count")) > 1
         for row in all_time + season_records + match_bests
     )
     return [
+        {
+            "issue_type": "identity_candidates",
+            "record_area": "athlete identity",
+            "affected_rows": len(identity_candidates),
+            "severity": "REVIEW",
+            "notes": "Review resolved and unresolved spelling variants.",
+        },
+        {
+            "issue_type": "display_ineligible_pr_events",
+            "record_area": "recent PR highlights",
+            "affected_rows": sum(
+                row["display_eligible"] == "false" for row in highlights
+            ),
+            "severity": "INFO",
+            "notes": (
+                "Valid PR events retained but withheld from celebration view."
+            ),
+        },
         {
             "issue_type": "placeholder_athlete_rows_excluded",
             "record_area": "all individual records",
@@ -859,8 +1181,14 @@ def _build_workbook(
         ("Personal Records", "personal_records.csv", PERSONAL_COLUMNS),
         ("PR History", "personal_record_history.csv", PR_HISTORY_COLUMNS),
         ("New PRs by Match", "new_personal_records_by_match.csv", NEW_PR_COLUMNS),
+        ("Recent PR Highlights", "recent_pr_highlights.csv", HIGHLIGHT_COLUMNS),
         ("Match Bests", "match_bests.csv", MATCH_BEST_COLUMNS),
         ("Stage Benchmarks", "stage_benchmarks.csv", STAGE_COLUMNS),
+        (
+            "Identity Candidates",
+            "records_identity_candidates.csv",
+            IDENTITY_CANDIDATE_COLUMNS,
+        ),
         ("Data Quality", "records_data_quality.csv", QUALITY_COLUMNS),
     )
     workbook = Workbook()
@@ -1007,6 +1335,50 @@ def _count_confidence(count: int) -> str:
     return "low"
 
 
+def _personal_confidence(
+    count: int,
+    score: float,
+    median: float | None,
+    partial: bool,
+) -> tuple[str, bool, str]:
+    outlier = score > 150 or (
+        median is not None and median > 0 and score > median * 2
+    )
+    if count == 1:
+        return (
+            "low",
+            False,
+            "Valid initial PR, but one score is not celebration-safe.",
+        )
+    if partial or outlier:
+        return (
+            "low",
+            False,
+            "Record is retained but requires partial/outlier review.",
+        )
+    if count >= 3:
+        return (
+            "high",
+            True,
+            "Established across at least three scored matches.",
+        )
+    return (
+        "medium",
+        True,
+        "Reasonable record candidate based on two scored matches.",
+    )
+
+
+def _median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
 def _chronology_key(row: dict[str, str]) -> tuple[str, int]:
     return (
         row.get("match_date") or "9999-12-31",
@@ -1098,8 +1470,14 @@ def _workbook_value(value: Any) -> Any:
 
 
 def _column_width(column: str, values: Iterable[Any]) -> float:
-    if column == "notes":
-        return 44
+    if column in {
+        "notes",
+        "identity_resolution_note",
+        "display_note",
+        "similarity_note",
+        "recommended_action",
+    }:
+        return 60
     maximum = max(
         [len(column.replace("_", " ").title())]
         + [len(str(value)) for value in values if value is not None]

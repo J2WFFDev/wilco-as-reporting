@@ -1005,6 +1005,13 @@ def run_records_build(arguments: Sequence[str]) -> int:
         f"{result.placeholder_rows_excluded}"
     )
     print(f"no-score rows excluded: {result.no_score_rows_excluded}")
+    print(f"identity candidates: {result.identity_candidates}")
+    print(f"initial PR rows: {result.initial_pr_count}")
+    print(f"improved PR rows: {result.improved_pr_count}")
+    print(
+        "display-ineligible PR highlights: "
+        f"{result.display_ineligible_count}"
+    )
     if result.workbook_path:
         print(f"workbook: {result.workbook_path}")
     print(f"records output: {result.records_dir}")

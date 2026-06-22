@@ -10,6 +10,13 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Iterable
 
+from wilco_as_reporting.athlete_aliases import (
+    AthleteAliasError,
+    apply_athlete_aliases,
+    load_athlete_aliases,
+)
+from wilco_as_reporting.history import _athlete_discipline_history
+
 IDENTITY_COLUMNS = (
     "athlete_name",
     "athlete_id",
@@ -152,12 +159,18 @@ def build_history_insights(
         )
     root = Path(output_root)
     source_dir = Path(history_dir) if history_dir else root / "history"
-    participation = _read_required(
+    participation_raw = _read_required(
         source_dir / "wilco_match_participation.csv"
     )
-    athlete_history = _read_required(
-        source_dir / "wilco_athlete_discipline_history.csv"
+    try:
+        aliases = load_athlete_aliases()
+    except AthleteAliasError as exc:
+        raise HistoryInsightsError(str(exc)) from exc
+    participation = apply_athlete_aliases(
+        participation_raw,
+        aliases,
     )
+    athlete_history = _athlete_discipline_history(participation, 1)
     source_matches = _read_required(
         source_dir / "history_source_matches.csv"
     )
