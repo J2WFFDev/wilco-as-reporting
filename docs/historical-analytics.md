@@ -63,3 +63,58 @@ Files are written under `output/history/`:
   discipline, and stage; they are not field-wide stage rankings.
 - Scores from different disciplines are not combined into a single numeric
   overall-performance metric.
+
+## Phase 6B Coach Insights
+
+Phase 6B reads the Phase 6A CSV files and creates a conservative,
+coach-facing insight layer. It makes no API calls and does not change the
+underlying historical tables.
+
+Run the default current-season coach brief:
+
+```powershell
+python -m wilco_as_reporting.cli history-insights --team-key wilco --output-dir output
+```
+
+Use `--season "25-26 Season"` to select the roster season. Add
+`--current-season-only` to restrict improvement and regression rows to that
+season. `--min-scored-matches` defaults to `2`, and `--no-workbook` creates
+CSV outputs only.
+
+Phase 6B creates:
+
+- `wilco_identity_issues.csv`
+- `wilco_improvement_leaderboard.csv`
+- `wilco_regression_watchlist.csv`
+- `wilco_current_season_roster.csv`
+- `wilco_discipline_insights.csv`
+- `wilco_coach_brief.csv`
+- `wilco_insight_data_quality_notes.csv`
+- `wilco_history_insights.xlsx`
+
+### Confidence and Identity Rules
+
+- Blank athlete names and athlete ID `9999` are identity issues.
+- Placeholder rows remain in Phase 6A source tables but are excluded from
+  coach insights by default. Use `--include-placeholders` only for data review.
+- High confidence requires four or more scored matches without an obvious
+  outlier signal.
+- Medium confidence represents three scored matches or a moderate outlier
+  concern.
+- Low confidence represents two scored matches or a large first-score
+  outlier concern.
+- A large improvement is flagged for review rather than invalidated.
+- Regression is measured from the latest score to the season median and is
+  reported only when the difference is at least one second and two percent.
+
+### Interpretation Cautions
+
+- Lower time is better.
+- Scores are compared only within the same discipline.
+- A two-match change is limited evidence, even when the difference is large.
+- Discipline medians compare the selected season with the immediately prior
+  available season; differences within half a second are labeled flat.
+- Match `671` remains Nationals participation context and does not contribute
+  to performance insights while its status is `no_scores`.
+- `no_team_entries` is not a failure, and historical validation totals remain
+  data-quality context rather than coaching conclusions.

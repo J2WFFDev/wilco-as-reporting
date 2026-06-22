@@ -17,6 +17,10 @@ from wilco_as_reporting.batch_refresh import (
 )
 from wilco_as_reporting.discovery import discover_matches
 from wilco_as_reporting.history import HistoryBuildError, build_history
+from wilco_as_reporting.history_insights import (
+    HistoryInsightsError,
+    build_history_insights,
+)
 from wilco_as_reporting.nationals_ops import NationalsOpsError
 from wilco_as_reporting.parsers import MatchParseError, parse_match
 from wilco_as_reporting.pipeline import (
@@ -364,6 +368,26 @@ def build_history_parser() -> argparse.ArgumentParser:
         default=True,
     )
     parser.add_argument("--min-athlete-matches", default=2, type=int)
+    parser.add_argument(
+        "--workbook",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    return parser
+
+
+def build_history_insights_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli history-insights",
+        description="Build coach insights from local Phase 6A history.",
+    )
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--history-dir", type=Path)
+    parser.add_argument("--season")
+    parser.add_argument("--min-scored-matches", default=2, type=int)
+    parser.add_argument("--current-season-only", action="store_true")
+    parser.add_argument("--include-placeholders", action="store_true")
     parser.add_argument(
         "--workbook",
         action=argparse.BooleanOptionalAction,
@@ -906,6 +930,33 @@ def run_history_build(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_history_insights(arguments: Sequence[str]) -> int:
+    args = build_history_insights_parser().parse_args(arguments)
+    try:
+        result = build_history_insights(
+            output_root=args.output_dir,
+            team_key=args.team_key,
+            history_dir=args.history_dir,
+            season=args.season,
+            min_scored_matches=args.min_scored_matches,
+            current_season_only=args.current_season_only,
+            include_placeholders=args.include_placeholders,
+            workbook=args.workbook,
+        )
+    except (HistoryInsightsError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"insight season: {result.season}")
+    print(f"identity issue affected rows: {result.identity_issue_rows}")
+    print(f"current-season athletes: {result.current_season_athletes}")
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    if result.workbook_path:
+        print(f"workbook: {result.workbook_path}")
+    print(f"history insights output: {result.history_dir}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -979,6 +1030,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_raw_status(command_arguments[1:])
     if command_arguments and command_arguments[0] == "history-build":
         return run_history_build(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "history-insights":
+        return run_history_insights(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
