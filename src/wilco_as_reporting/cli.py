@@ -22,6 +22,10 @@ from wilco_as_reporting.history_insights import (
     build_history_insights,
 )
 from wilco_as_reporting.nationals_ops import NationalsOpsError
+from wilco_as_reporting.nationals_readiness import (
+    NationalsReadinessError,
+    build_nationals_readiness,
+)
 from wilco_as_reporting.parsers import MatchParseError, parse_match
 from wilco_as_reporting.pipeline import (
     build_nationals_match,
@@ -413,6 +417,30 @@ def build_records_parser() -> argparse.ArgumentParser:
     parser.add_argument("--include-placeholders", action="store_true")
     parser.add_argument(
         "--workbook",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    return parser
+
+
+def build_nationals_readiness_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli nationals-readiness",
+        description="Build a private coach-facing Nationals readiness brief.",
+    )
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--match-id", default=671, type=int)
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--history-dir", type=Path)
+    parser.add_argument("--records-dir", type=Path)
+    parser.add_argument("--season")
+    parser.add_argument(
+        "--workbook",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--include-limited-history",
         action=argparse.BooleanOptionalAction,
         default=True,
     )
@@ -1018,6 +1046,45 @@ def run_records_build(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_nationals_readiness(arguments: Sequence[str]) -> int:
+    args = build_nationals_readiness_parser().parse_args(arguments)
+    try:
+        profile = load_team_profile(args.team_key)
+        result = build_nationals_readiness(
+            output_root=args.output_dir,
+            profile=profile,
+            match_id=args.match_id,
+            history_dir=args.history_dir,
+            records_dir=args.records_dir,
+            season=args.season,
+            workbook=args.workbook,
+            include_limited_history=args.include_limited_history,
+        )
+    except (
+        NationalsReadinessError,
+        TeamProfileError,
+        ValueError,
+    ) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"athletes entered: {result.athletes_entered}")
+    print(
+        "athlete-discipline entries: "
+        f"{result.athlete_discipline_entries}"
+    )
+    for level, count in sorted(result.readiness_counts.items()):
+        print(f"readiness {level}: {count}")
+    for opportunity, count in sorted(result.opportunity_counts.items()):
+        print(f"PR opportunity {opportunity}: {count}")
+    print(f"watchlist items: {result.watchlist_count}")
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    if result.workbook_path:
+        print(f"workbook: {result.workbook_path}")
+    print(f"readiness output: {result.output_dir}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -1095,6 +1162,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_history_insights(command_arguments[1:])
     if command_arguments and command_arguments[0] == "records-build":
         return run_records_build(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "nationals-readiness":
+        return run_nationals_readiness(command_arguments[1:])
     return run_fetch(command_arguments)
 
 
