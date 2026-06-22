@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Sequence
 
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
+from wilco_as_reporting.analysis_workbook import (
+    AnalysisWorkbookError,
+    build_analysis_workbook,
+)
 from wilco_as_reporting.batch_refresh import (
     BUILD_LEVELS,
     BatchRefreshError,
@@ -465,6 +469,32 @@ def build_nationals_packet_parser() -> argparse.ArgumentParser:
     parser.add_argument("--top-priorities", default=10, type=int)
     parser.add_argument(
         "--workbook",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    return parser
+
+
+def build_analysis_workbook_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli analysis-workbook",
+        description="Build the curated Wilco analysis workbook.",
+    )
+    parser.add_argument("--team-key", default="wilco")
+    parser.add_argument("--match-id", type=int)
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--history-dir", type=Path)
+    parser.add_argument("--records-dir", type=Path)
+    parser.add_argument("--nationals-readiness-dir", type=Path)
+    parser.add_argument("--past-seasons", default=2, type=int)
+    parser.add_argument("--workbook-name")
+    parser.add_argument(
+        "--include-all-teams",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--include-validation",
         action=argparse.BooleanOptionalAction,
         default=True,
     )
@@ -1133,6 +1163,40 @@ def run_nationals_packet(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_analysis_workbook(arguments: Sequence[str]) -> int:
+    args = build_analysis_workbook_parser().parse_args(arguments)
+    try:
+        profile = load_team_profile(args.team_key)
+        result = build_analysis_workbook(
+            output_root=args.output_dir,
+            profile=profile,
+            match_id=args.match_id,
+            history_dir=args.history_dir,
+            records_dir=args.records_dir,
+            nationals_readiness_dir=args.nationals_readiness_dir,
+            past_seasons=args.past_seasons,
+            workbook_name=args.workbook_name,
+            include_all_teams=args.include_all_teams,
+            include_validation=args.include_validation,
+        )
+    except (
+        AnalysisWorkbookError,
+        TeamProfileError,
+        ValueError,
+    ) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"selected match: {result.selected_match_id}")
+    print(f"selected match name: {result.selected_match_name}")
+    print(f"selected match has no scores: {result.no_score_selected_match}")
+    for filename, row_count in result.row_counts.items():
+        print(f"{filename}: {row_count} rows")
+    print(f"chart included: {result.chart_included}")
+    print(f"workbook: {result.workbook_path}")
+    print(f"analysis tables: {result.tables_dir}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -1214,6 +1278,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_nationals_readiness(command_arguments[1:])
     if command_arguments and command_arguments[0] == "nationals-packet":
         return run_nationals_packet(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "analysis-workbook":
+        return run_analysis_workbook(command_arguments[1:])
     return run_fetch(command_arguments)
 
 

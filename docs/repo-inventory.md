@@ -54,8 +54,7 @@ All implemented commands are `keep_production`:
 18. `records-build`
 19. `nationals-readiness`
 20. `nationals-packet`
-
-`analysis-workbook` is not implemented.
+21. `analysis-workbook`
 
 ## Configuration Files
 
@@ -80,6 +79,7 @@ data rules, or operator workflows:
 - `docs/records-report.md`
 - `docs/nationals-readiness.md`
 - `docs/nationals-coach-packet.md`
+- `docs/analysis-workbook.md`
 - `docs/repository-layout.md`
 - `docs/repo-inventory.md`
 
@@ -110,7 +110,7 @@ remain aligned with existing CLI commands.
 | `incremental-refresh.yml` | Refresh watched, active, and recent matches |
 
 No workflow was archived or removed. Historical analytics, records,
-readiness, and coach-packet commands remain local-only.
+readiness, coach-packet, and analysis-workbook commands remain local-only.
 
 ## Archived Items
 
@@ -141,8 +141,6 @@ repository content.
 
 ## Open Cleanup Questions
 
-- Should a future `analysis-workbook` command be added? It is not currently
-  implemented and is not documented as an active command.
 - Should local-only history/records/Nationals planning commands eventually
   receive manual Actions workflows? They are intentionally local-only today.
 - Should the generic Customer 2 SASP concepts become a separate package or

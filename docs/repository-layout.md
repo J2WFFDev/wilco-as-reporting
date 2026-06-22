@@ -26,6 +26,7 @@ wilco-as-reporting/
 │       ├── validators/
 │       ├── workbooks/
 │       ├── athlete_aliases.py
+│       ├── analysis_workbook.py
 │       ├── batch_refresh.py
 │       ├── cli.py
 │       ├── discovery.py
@@ -55,6 +56,7 @@ wilco-as-reporting/
 - `workbooks/`: generic, team, and Nationals operations workbooks.
 - `history.py` and `history_insights.py`: historical analytics layers.
 - `records.py`: Wilco and personal-record reporting.
+- `analysis_workbook.py`: consolidated Wilco analysis tables and workbook.
 - `nationals_readiness.py` and `nationals_packet.py`: private coach planning.
 - `batch_refresh.py`, `refresh_manifest.py`, and `nationals_ops.py`: bounded
   refresh, state, and event operations.
