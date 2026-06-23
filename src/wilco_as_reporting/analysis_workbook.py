@@ -28,16 +28,18 @@ HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
 LABEL_FILL = PatternFill("solid", fgColor="D9EAF7")
 
-SHEETS = (
+EXCEL_MAX_ROWS = 1_048_576
+VIEW_SETS = ("historical-prep", "wilco-match", "staff-match", "all")
+
+HISTORICAL_PREP_SHEETS = (
     (
-        "Wilco Match Score History",
-        "wilco_match_score_history.csv",
+        "Wilco Historical Score History",
+        "wilco_historical_score_history.csv",
         (
-            "match_id", "match_name", "match_date", "season_label",
-            "athlete_name", "athlete_id", "division", "class", "gender",
-            "discipline", "match_score", "overall_place", "gender_place",
-            "division_place", "class_place", "squad_place", "rank_scope",
-            "award_scope", "data_status", "notes",
+            "match_name", "match_date", "season_label", "athlete_name",
+            "athlete_id", "division", "class", "gender", "discipline",
+            "overall_place", "gender_place", "division_place",
+            "class_place", "match_score",
         ),
     ),
     (
@@ -45,33 +47,10 @@ SHEETS = (
         "athlete_performance_by_discipline.csv",
         (
             "athlete_name", "athlete_id", "discipline",
-            "number_of_matches", "scored_matches_count", "best_score",
-            "match_with_best_score", "best_score_date", "most_recent_score",
-            "most_recent_match", "most_recent_date", "avg_score",
+            "number_of_matches", "best_score", "match_with_best_score",
+            "most_recent_score", "most_recent_match", "avg_score",
             "median_score", "personal_record_score", "seconds_from_pr",
-            "trend_note", "confidence_level",
-        ),
-    ),
-    (
-        "All Teams by Match & Disc",
-        "all_teams_by_match_and_discipline.csv",
-        (
-            "match_id", "match_name", "match_date", "discipline",
-            "team_name", "team_id", "athlete_count", "entry_count",
-            "avg_score", "median_score", "best_score", "top_4_average",
-            "squad_count", "is_wilco", "notes",
-        ),
-    ),
-    (
-        "Published SASP Rankings",
-        "published_sasp_rankings.csv",
-        (
-            "match_id", "match_name", "match_date", "discipline",
-            "athlete_name", "athlete_id", "score", "rank_type",
-            "rank_scope", "place", "field_size", "percentile",
-            "margin_to_leader", "margin_to_previous_place",
-            "margin_to_podium_cutoff", "team_name", "athlete_class",
-            "gender", "squad_name", "source_file",
+            "trend_note",
         ),
     ),
     (
@@ -80,52 +59,12 @@ SHEETS = (
         (),
     ),
     (
-        "Athlete Discipline Stage Values",
-        "athlete_discipline_stage_values.csv",
-        (
-            "athlete_name", "athlete_id", "discipline", "stage_name",
-            "season_label", "match_id", "match_name", "avg_string",
-            "fastest_string", "avg_stage", "fastest_stage",
-            "match_score", "notes",
-        ),
-    ),
-    (
         "Wilco vs Field by Discipline",
         "wilco_vs_field_by_discipline.csv",
         (
-            "discipline", "wilco_entries", "field_entries", "wilco_avg",
-            "field_avg", "wilco_best", "field_best", "top_team_avg",
-            "avg_gap_to_field", "best_gap_to_field", "trend_note",
-        ),
-    ),
-    (
-        "Match Results",
-        "match_results.csv",
-        (
-            "match_id", "match_name", "match_date", "athlete_name",
-            "athlete_id", "discipline", "division", "class", "gender",
-            "match_score", "current_rank", "rank_scope", "award_scope",
-            "field_size", "notes",
-        ),
-    ),
-    (
-        "Wilco Stage Review",
-        "match_review_wilco_stage_scores.csv",
-        (
-            "match_id", "match_name", "athlete_name", "athlete_id",
-            "discipline", "stage_name", "stage_score", "fastest_string",
-            "avg_string", "string_count", "match_total", "current_rank",
-            "rank_scope", "notes",
-        ),
-    ),
-    (
-        "National Staff Validation",
-        "match_review_national_staff_validation.csv",
-        (
-            "match_id", "match_name", "severity", "finding_type",
-            "athlete_name", "team_name", "discipline", "stage_name",
-            "score", "expected_score", "difference", "finding_message",
-            "recommended_review", "notes",
+            "discipline", "Wilco Entries", "Field Entries", "Wilco Avg",
+            "Field Avg", "Wilco Best", "Field Best", "Top Team Avg",
+            "Avg Gap To Field",
         ),
     ),
     (
@@ -133,26 +72,154 @@ SHEETS = (
         "records_and_prs.csv",
         (
             "record_type", "athlete_name", "discipline", "score",
-            "match_name", "match_date", "season_label", "previous_score",
+            "match_name", "match_date", "previous_score",
             "improvement_seconds", "display_eligible",
             "confidence_level", "notes",
         ),
     ),
     (
-        "Selected Match Highlights",
-        "selected_match_record_highlights.csv",
+        "Data Quality Notes",
+        "historical_prep_data_quality_notes.csv",
+        ("area", "issue_type", "affected_rows", "severity", "notes"),
+    ),
+)
+
+WILCO_MATCH_SHEETS = (
+    (
+        "Wilco Match Results",
+        "wilco_match_results.csv",
         (
-            "match_id", "match_name", "match_date", "athlete_name",
-            "discipline", "highlight_type", "score",
+            "athlete_name", "athlete_id", "discipline", "division",
+            "class", "gender", "match_score", "current_rank",
+            "rank_scope", "field_size", "notes",
+        ),
+    ),
+    (
+        "Wilco Stage Review",
+        "wilco_stage_review.csv",
+        (
+            "athlete_name", "athlete_id", "discipline", "stage_name",
+            "stage_score", "fastest_string", "avg_string", "match_total",
+            "current_rank", "notes",
+        ),
+    ),
+    (
+        "Match Records and PRs",
+        "match_records_and_prs.csv",
+        (
+            "athlete_name", "discipline", "highlight_type", "score",
             "previous_record_or_pr", "improvement_seconds",
-            "record_scope", "display_eligible", "notes",
+            "display_eligible", "notes",
+        ),
+    ),
+    (
+        "Coach Review Queue",
+        "coach_review_queue.csv",
+        (
+            "severity", "athlete_name", "discipline", "stage_name",
+            "finding_type", "finding_message", "recommended_review", "notes",
         ),
     ),
     (
         "Data Quality Notes",
-        "data_quality_notes.csv",
+        "wilco_match_data_quality_notes.csv",
         ("area", "issue_type", "affected_rows", "severity", "notes"),
     ),
+)
+
+STAFF_MATCH_SHEETS = (
+    (
+        "All Competitor Match Results",
+        "all_competitor_match_results.csv",
+        (
+            "athlete_name", "team_name", "discipline", "division",
+            "class", "gender", "match_score", "place", "rank_scope",
+            "field_size", "notes",
+        ),
+    ),
+    (
+        "Published Ranking Detail",
+        "published_ranking_detail.csv",
+        (
+            "discipline", "athlete_name", "team_name", "score",
+            "rank_type", "rank_scope", "place", "field_size", "percentile",
+            "margin_to_leader", "margin_to_previous_place",
+            "margin_to_podium_cutoff", "athlete_class", "gender",
+            "source_file",
+        ),
+    ),
+    (
+        "Validation Findings",
+        "validation_findings.csv",
+        (
+            "severity", "finding_type", "athlete_name", "team_name",
+            "discipline", "stage_name", "score", "expected_score",
+            "difference", "finding_message", "recommended_review", "notes",
+        ),
+    ),
+    (
+        "Field by Discipline",
+        "field_by_discipline.csv",
+        (
+            "discipline", "teams_count", "athletes_count", "entries_count",
+            "field_avg", "field_best", "top_team_avg", "Wilco Avg",
+            "Wilco Best", "Wilco Gap To Field",
+        ),
+    ),
+    (
+        "Records Match Bests",
+        "records_match_bests.csv",
+        (
+            "highlight_type", "athlete_name", "team_name", "discipline",
+            "score", "record_scope", "notes",
+        ),
+    ),
+    (
+        "Data Quality Notes",
+        "staff_match_data_quality_notes.csv",
+        ("area", "issue_type", "affected_rows", "severity", "notes"),
+    ),
+)
+
+LONG_CSVS = {
+    "athlete_discipline_stage_values.csv": (
+        "athlete_name", "athlete_id", "discipline", "stage_name",
+        "season_label", "match_id", "match_name", "avg_string",
+        "fastest_string", "avg_stage", "fastest_stage",
+        "match_score", "notes",
+    ),
+    "all_historical_match_scores_full.csv": (
+        "match_id", "match_name", "discipline", "athlete_id",
+        "athlete_name", "team_name", "class", "gender",
+        "match_score_seconds", "dnf_flag", "dq_flag",
+    ),
+}
+
+VIEW_CONFIG = {
+    "historical-prep": {
+        "directory": "historical_prep",
+        "filename": "wilco_historical_records_prep.xlsx",
+        "workbook_type": "Wilco Historical Records and Match Prep",
+        "sheets": HISTORICAL_PREP_SHEETS,
+    },
+    "wilco-match": {
+        "directory": "wilco_match",
+        "filename": "wilco_match_management_{match_id}.xlsx",
+        "workbook_type": "Wilco Match Management and Results with Records",
+        "sheets": WILCO_MATCH_SHEETS,
+    },
+    "staff-match": {
+        "directory": "staff_match",
+        "filename": "staff_match_review_{match_id}.xlsx",
+        "workbook_type": "Nationals Staff Match Review, Results with Records",
+        "sheets": STAFF_MATCH_SHEETS,
+    },
+}
+
+ALL_SHEETS = (
+    *HISTORICAL_PREP_SHEETS,
+    *WILCO_MATCH_SHEETS,
+    *STAFF_MATCH_SHEETS,
 )
 
 SECONDS_COLUMNS = {
@@ -163,6 +230,8 @@ SECONDS_COLUMNS = {
     "avg_gap_to_field", "best_gap_to_field", "stage_score", "match_total",
     "expected_score", "difference", "previous_score",
     "improvement_seconds", "previous_record_or_pr",
+    "Wilco Avg", "Field Avg", "Wilco Best", "Field Best", "Top Team Avg",
+    "Avg Gap To Field", "Wilco Gap To Field",
 }
 
 
@@ -172,14 +241,17 @@ class AnalysisWorkbookError(RuntimeError):
 
 @dataclass(frozen=True)
 class AnalysisWorkbookResult:
-    workbook_path: Path
+    workbook_path: Path | None
+    workbook_paths: dict[str, Path]
     tables_dir: Path
     selected_match_id: int
     selected_match_name: str
-    sheet_names: tuple[str, ...]
-    row_counts: dict[str, int]
-    chart_included: bool
+    sheet_names: dict[str, tuple[str, ...]]
+    row_counts: dict[str, dict[str, int]]
+    csv_row_counts: dict[str, int]
+    chart_included: dict[str, bool]
     no_score_selected_match: bool
+    excel_row_limit_notes: tuple[str, ...]
 
 
 def build_analysis_workbook(
@@ -194,8 +266,13 @@ def build_analysis_workbook(
     workbook_name: str | None = None,
     include_all_teams: bool = True,
     include_validation: bool = True,
+    view_set: str = "historical-prep",
 ) -> AnalysisWorkbookResult:
     """Build the analysis tables and workbook without making API calls."""
+    if view_set not in VIEW_SETS:
+        raise AnalysisWorkbookError(
+            f"--view-set must be one of: {', '.join(VIEW_SETS)}"
+        )
     root = Path(output_root)
     history = Path(history_dir) if history_dir else root / "history"
     records = Path(records_dir) if records_dir else root / "records"
@@ -255,9 +332,6 @@ def build_analysis_workbook(
         _read_optional(records / "personal_records.csv"),
     )
     all_scores = _load_all_scores(root, scoped_ids, aliases)
-    all_teams = _all_team_rows(
-        all_scores, source_lookup, profile, include_all_teams
-    )
     stage_values = _stage_value_rows(
         root, scoped_ids, source_lookup, profile, aliases,
         scoped_participation,
@@ -267,6 +341,10 @@ def build_analysis_workbook(
     match_results = _selected_match_rows(
         selected_id, selected_name, selected_date, selected_scores,
         profile, ranking_index,
+    )
+    all_match_results = _all_selected_match_rows(
+        selected_id, selected_name, selected_date, selected_scores,
+        ranking_index,
     )
     stage_review = _selected_stage_rows(
         root, selected_id, selected_name, selected_scores, profile,
@@ -278,6 +356,17 @@ def build_analysis_workbook(
     records_rows = _records_rows(records, seasons)
     highlights = _highlight_rows(
         records, selected_id, selected_name, selected_date
+    )
+    coach_queue = [
+        row for row in validation
+        if row.get("severity") in {"ERROR", "WARNING", "REVIEW"}
+        and profile.matches_name(row.get("team_name"))
+    ]
+    field_by_discipline = _field_by_discipline_rows(
+        selected_scores, profile
+    )
+    selected_match_bests = _selected_match_best_rows(
+        highlights, selected_scores
     )
     no_score = not any(_number(row.get("match_score_seconds"))
                        for row in selected_scores
@@ -296,25 +385,70 @@ def build_analysis_workbook(
         validation_rows=validation,
         readiness_dir=readiness,
     )
+    historical_quality = _with_quality_context(
+        quality,
+        [
+            ("csv_full_table", "athlete_discipline_stage_values.csv",
+             len(stage_values),
+             "Long-form stage values are CSV-only capability detail."),
+            ("csv_full_table", "all_historical_match_scores_full.csv",
+             len(all_scores),
+             "Full all-team historical match scores are written to CSV."),
+        ],
+    )
+    wilco_match_quality = _with_quality_context(
+        quality,
+        [("selected_match", "wilco_scope", len(match_results),
+          "Workbook is scoped to Wilco Shooting Sports entries.")]
+    )
+    staff_match_quality = _with_quality_context(
+        quality,
+        [("selected_match", "all_competitors", len(all_match_results),
+          "Workbook includes all available competitors for the selected match.")]
+    )
     rows_by_filename: dict[str, list[dict[str, Any]]] = {
-        "wilco_match_score_history.csv": match_history,
+        "wilco_historical_score_history.csv": _project_rows(
+            match_history,
+            _columns_for("wilco_historical_score_history.csv"),
+        ),
         "athlete_performance_by_discipline.csv": athlete_performance,
-        "all_teams_by_match_and_discipline.csv": all_teams,
-        "published_sasp_rankings.csv": rankings,
         "athlete_capability_matrix.csv": capability,
         "athlete_discipline_stage_values.csv": stage_values,
-        "wilco_vs_field_by_discipline.csv": field_comparison,
-        "match_results.csv": match_results,
-        "match_review_wilco_stage_scores.csv": stage_review,
-        "match_review_national_staff_validation.csv": validation,
+        "all_historical_match_scores_full.csv": all_scores,
+        "wilco_vs_field_by_discipline.csv": _historical_field_rows(
+            field_comparison
+        ),
+        "wilco_match_results.csv": _project_rows(
+            match_results, _columns_for("wilco_match_results.csv"),
+        ),
+        "wilco_stage_review.csv": _project_rows(
+            stage_review, _columns_for("wilco_stage_review.csv"),
+        ),
+        "match_records_and_prs.csv": _project_rows(
+            highlights, _columns_for("match_records_and_prs.csv"),
+        ),
+        "coach_review_queue.csv": _project_rows(
+            coach_queue, _columns_for("coach_review_queue.csv"),
+        ),
+        "all_competitor_match_results.csv": all_match_results,
+        "published_ranking_detail.csv": _selected_ranking_detail(
+            rankings, selected_id
+        ),
+        "validation_findings.csv": _project_rows(
+            validation, _columns_for("validation_findings.csv"),
+        ),
+        "field_by_discipline.csv": field_by_discipline,
+        "records_match_bests.csv": selected_match_bests,
         "records_and_prs.csv": records_rows,
-        "selected_match_record_highlights.csv": highlights,
-        "data_quality_notes.csv": quality,
+        "historical_prep_data_quality_notes.csv": historical_quality,
+        "wilco_match_data_quality_notes.csv": wilco_match_quality,
+        "staff_match_data_quality_notes.csv": staff_match_quality,
     }
     columns_by_filename = {
         filename: tuple(columns)
-        for _, filename, columns in SHEETS
+        for _, filename, columns in ALL_SHEETS
     }
+    columns_by_filename.update(LONG_CSVS)
     columns_by_filename["athlete_capability_matrix.csv"] = capability_columns
 
     analysis_dir = root / "analysis"
@@ -323,49 +457,186 @@ def build_analysis_workbook(
     for filename, rows in rows_by_filename.items():
         _write_csv(tables_dir / filename, columns_by_filename[filename], rows)
 
-    workbook_path = analysis_dir / (
-        workbook_name or "wilco_analysis_workbook.xlsx"
+    views = (
+        ("historical-prep", "wilco-match", "staff-match")
+        if view_set == "all" else (view_set,)
     )
-    if workbook_path.suffix.casefold() != ".xlsx":
-        workbook_path = workbook_path.with_suffix(".xlsx")
-    cover = {
-        "workbook_name": workbook_path.stem.replace("_", " ").title(),
-        "generated_at": datetime.now(timezone.utc)
-        .replace(microsecond=0).isoformat(),
-        "team_key": profile.team_key,
-        "selected_match_id": selected_id,
-        "selected_match_name": selected_name,
-        "selected_match_date": selected_date,
-        "seasons_included": ", ".join(seasons),
+    workbook_paths: dict[str, Path] = {}
+    sheet_names: dict[str, tuple[str, ...]] = {}
+    row_counts: dict[str, dict[str, int]] = {}
+    chart_included: dict[str, bool] = {}
+    row_limit_notes: list[str] = []
+    source_counts = {
         "source_matches_count": len(scoped_sources),
-        "athletes_count": len({
-            (row.get("athlete_name"), row.get("athlete_id"))
-            for row in scoped_participation
-        }),
-        "disciplines_count": len({
-            row.get("discipline") for row in scoped_participation
-        }),
-        "notes": (
-            "Lower times are better. Stage and string values are capability "
-            "benchmarks, not formal records. Long requested sheet names are "
-            "abbreviated to comply with Excel's 31-character limit."
-        ),
+        "wilco_score_history_rows": len(match_history),
+        "all_historical_score_rows": len(all_scores),
+        "selected_match_score_rows": len(selected_scores),
+        "selected_match_validation_rows": len(validation),
+        "long_stage_value_rows": len(stage_values),
     }
-    chart_included = _write_workbook(
-        workbook_path, cover, rows_by_filename, columns_by_filename
-    )
+    for view in views:
+        config = VIEW_CONFIG[view]
+        filename = (
+            workbook_name if workbook_name and len(views) == 1
+            else config["filename"].format(match_id=selected_id)
+        )
+        workbook_path = analysis_dir / config["directory"] / filename
+        if workbook_path.suffix.casefold() != ".xlsx":
+            workbook_path = workbook_path.with_suffix(".xlsx")
+        sheets = config["sheets"]
+        cover = _cover_values(
+            workbook_type=config["workbook_type"],
+            workbook_path=workbook_path,
+            profile=profile,
+            selected_id=selected_id,
+            selected_name=selected_name,
+            selected_date=selected_date,
+            seasons=seasons,
+            scoped_sources=scoped_sources,
+            scoped_participation=scoped_participation,
+            source_counts=source_counts,
+        )
+        workbook_row_limit_notes = _row_limit_notes(
+            sheets, rows_by_filename
+        )
+        row_limit_notes.extend(workbook_row_limit_notes)
+        if workbook_row_limit_notes:
+            cover["excel_row_limit_notes"] = " | ".join(
+                workbook_row_limit_notes
+            )
+        chart_included[view] = _write_workbook(
+            workbook_path, cover, rows_by_filename, columns_by_filename,
+            sheets,
+        )
+        workbook_paths[view] = workbook_path
+        sheet_names[view] = ("Cover", *(sheet for sheet, _, _ in sheets))
+        row_counts[view] = {
+            filename: len(rows_by_filename[filename])
+            for _, filename, _ in sheets
+        }
     return AnalysisWorkbookResult(
-        workbook_path=workbook_path,
+        workbook_path=next(iter(workbook_paths.values()), None),
+        workbook_paths=workbook_paths,
         tables_dir=tables_dir,
         selected_match_id=selected_id,
         selected_match_name=selected_name,
-        sheet_names=("Cover", *(sheet for sheet, _, _ in SHEETS)),
-        row_counts={
+        sheet_names=sheet_names,
+        row_counts=row_counts,
+        csv_row_counts={
             filename: len(rows) for filename, rows in rows_by_filename.items()
         },
         chart_included=chart_included,
         no_score_selected_match=no_score,
+        excel_row_limit_notes=tuple(dict.fromkeys(row_limit_notes)),
     )
+
+
+def _columns_for(filename: str) -> tuple[str, ...]:
+    for _, candidate, columns in ALL_SHEETS:
+        if candidate == filename:
+            return tuple(columns)
+    if filename in LONG_CSVS:
+        return LONG_CSVS[filename]
+    raise AnalysisWorkbookError(f"No column definition for {filename}")
+
+
+def _project_rows(
+    rows: list[dict[str, Any]], columns: tuple[str, ...]
+) -> list[dict[str, Any]]:
+    return [{column: row.get(column, "") for column in columns} for row in rows]
+
+
+def _with_quality_context(
+    rows: list[dict[str, Any]],
+    additions: list[tuple[str, str, int, str]],
+) -> list[dict[str, Any]]:
+    result = list(rows)
+    for area, issue_type, count, notes in additions:
+        result.append({
+            "area": area,
+            "issue_type": issue_type,
+            "affected_rows": count,
+            "severity": "INFO",
+            "notes": notes,
+        })
+    return result
+
+
+def _historical_field_rows(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "discipline": row.get("discipline", ""),
+            "Wilco Entries": row.get("wilco_entries", ""),
+            "Field Entries": row.get("field_entries", ""),
+            "Wilco Avg": row.get("wilco_avg", ""),
+            "Field Avg": row.get("field_avg", ""),
+            "Wilco Best": row.get("wilco_best", ""),
+            "Field Best": row.get("field_best", ""),
+            "Top Team Avg": row.get("top_team_avg", ""),
+            "Avg Gap To Field": row.get("avg_gap_to_field", ""),
+        }
+        for row in rows
+    ]
+
+
+def _cover_values(
+    *,
+    workbook_type: str,
+    workbook_path: Path,
+    profile: TeamProfile,
+    selected_id: int,
+    selected_name: str,
+    selected_date: str,
+    seasons: tuple[str, ...],
+    scoped_sources: list[dict[str, str]],
+    scoped_participation: list[dict[str, Any]],
+    source_counts: dict[str, int],
+) -> dict[str, Any]:
+    return {
+        "workbook_type": workbook_type,
+        "workbook_name": workbook_path.stem.replace("_", " ").title(),
+        "generated_at": datetime.now(timezone.utc)
+        .replace(microsecond=0).isoformat(),
+        "team_key": profile.team_key,
+        "team_name": profile.team_name,
+        "team_number": profile.team_number,
+        "selected_match_id": selected_id,
+        "selected_match_name": selected_name,
+        "selected_match_date": selected_date,
+        "seasons_included": ", ".join(seasons),
+        "wilco_matches_included": len(scoped_sources),
+        "wilco_athletes_included": len({
+            (row.get("athlete_name"), row.get("athlete_id"))
+            for row in scoped_participation
+        }),
+        "source_row_counts": "; ".join(
+            f"{key}={value}" for key, value in source_counts.items()
+        ),
+        "excel_row_limit_notes": "No workbook tabs exceed Excel row limits.",
+        "notes": (
+            "Lower score/time is better. Blank athlete names and athlete ID "
+            "9999 are excluded by default. Stage/string values are capability "
+            "benchmarks only, not formal records."
+        ),
+    }
+
+
+def _row_limit_notes(
+    sheets: tuple[tuple[str, str, tuple[str, ...]], ...],
+    rows_by_filename: dict[str, list[dict[str, Any]]],
+) -> list[str]:
+    notes = []
+    for sheet_name, filename, _ in sheets:
+        row_count = len(rows_by_filename.get(filename, []))
+        if row_count + 1 > EXCEL_MAX_ROWS:
+            notes.append(
+                f"{sheet_name}: {row_count} source rows exceed Excel's "
+                f"{EXCEL_MAX_ROWS:,}-row sheet limit; full data is in "
+                f"output/analysis/tables/{filename}."
+            )
+    return notes
 
 
 def _match_history_rows(
@@ -690,6 +961,41 @@ def _selected_match_rows(
     ))
 
 
+def _all_selected_match_rows(
+    match_id: int, match_name: str, match_date: str,
+    scores: list[dict[str, Any]],
+    rankings: dict[tuple[str, str, str], list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    results = []
+    for row in scores:
+        if _is_placeholder(row):
+            continue
+        key = (str(match_id), row.get("athlete_name", ""),
+               row.get("discipline", ""))
+        preferred = _preferred_ranking(rankings.get(key, []))
+        score = _number(row.get("match_score_seconds"))
+        results.append({
+            "athlete_name": row.get("athlete_name", ""),
+            "team_name": row.get("team_name", ""),
+            "discipline": row.get("discipline", ""),
+            "division": _division(row.get("class", "")),
+            "class": row.get("class", ""),
+            "gender": row.get("gender", ""),
+            "match_score": _display(score),
+            "place": preferred.get("place", ""),
+            "rank_scope": preferred.get("rank_scope", ""),
+            "field_size": preferred.get("field_size", ""),
+            "notes": (
+                f"Selected match {match_id}: {match_name} "
+                f"({match_date})."
+            ),
+        })
+    return sorted(results, key=lambda row: (
+        row["discipline"], _integer(row["place"]) or 999999,
+        row["athlete_name"]
+    ))
+
+
 def _selected_stage_rows(
     root: Path, match_id: int, match_name: str,
     scores: list[dict[str, Any]], profile: TeamProfile,
@@ -739,6 +1045,93 @@ def _selected_stage_rows(
     return sorted(results, key=lambda row: (
         row["athlete_name"], row["discipline"], row["stage_name"]
     ))
+
+
+def _selected_ranking_detail(
+    rankings: list[dict[str, Any]], match_id: int
+) -> list[dict[str, Any]]:
+    columns = _columns_for("published_ranking_detail.csv")
+    return _project_rows(
+        [row for row in rankings if _integer(row.get("match_id")) == match_id],
+        columns,
+    )
+
+
+def _field_by_discipline_rows(
+    scores: list[dict[str, Any]], profile: TeamProfile
+) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in scores:
+        if _is_placeholder(row):
+            continue
+        if _number(row.get("match_score_seconds")) is not None:
+            grouped[row.get("discipline", "")].append(row)
+    results = []
+    for discipline, rows in grouped.items():
+        values = [
+            _number(row.get("match_score_seconds")) for row in rows
+        ]
+        values = [value for value in values if value is not None]
+        wilco_values = [
+            _number(row.get("match_score_seconds")) for row in rows
+            if profile.matches_name(row.get("team_name"))
+        ]
+        wilco_values = [
+            value for value in wilco_values if value is not None
+        ]
+        team_values: dict[str, list[float]] = defaultdict(list)
+        athletes = set()
+        for row in rows:
+            score = _number(row.get("match_score_seconds"))
+            if score is None:
+                continue
+            team_values[row.get("team_name", "")].append(score)
+            athletes.add((row.get("athlete_id", ""), row.get("athlete_name", "")))
+        field_avg = statistics.mean(values) if values else None
+        wilco_avg = statistics.mean(wilco_values) if wilco_values else None
+        results.append({
+            "discipline": discipline,
+            "teams_count": len([team for team in team_values if team]),
+            "athletes_count": len(athletes),
+            "entries_count": len(values),
+            "field_avg": _display(field_avg),
+            "field_best": _display(min(values) if values else None),
+            "top_team_avg": _display(min(
+                (statistics.mean(sorted(team_scores)[:4])
+                 for team_scores in team_values.values() if team_scores),
+                default=None,
+            )),
+            "Wilco Avg": _display(wilco_avg),
+            "Wilco Best": _display(min(wilco_values) if wilco_values else None),
+            "Wilco Gap To Field": _display(
+                wilco_avg - field_avg
+                if wilco_avg is not None and field_avg is not None else None
+            ),
+        })
+    return sorted(results, key=lambda row: row["discipline"])
+
+
+def _selected_match_best_rows(
+    highlights: list[dict[str, Any]], scores: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    team_lookup = {
+        (row.get("athlete_name", ""), row.get("discipline", "")):
+        row.get("team_name", "") for row in scores
+    }
+    rows = []
+    for row in highlights:
+        rows.append({
+            "highlight_type": row.get("highlight_type", ""),
+            "athlete_name": row.get("athlete_name", ""),
+            "team_name": team_lookup.get((
+                row.get("athlete_name", ""), row.get("discipline", "")
+            ), ""),
+            "discipline": row.get("discipline", ""),
+            "score": row.get("score", ""),
+            "record_scope": row.get("record_scope", ""),
+            "notes": row.get("notes", ""),
+        })
+    return rows
 
 
 def _validation_rows(
@@ -1116,6 +1509,7 @@ def _write_workbook(
     path: Path, cover_values: dict[str, Any],
     rows_by_filename: dict[str, list[dict[str, Any]]],
     columns_by_filename: dict[str, tuple[str, ...]],
+    sheets: tuple[tuple[str, str, tuple[str, ...]], ...],
 ) -> bool:
     workbook = Workbook()
     cover = workbook.active
@@ -1136,13 +1530,17 @@ def _write_workbook(
     cover.column_dimensions["B"].width = 90
     cover.freeze_panes = "A3"
     chart_included = False
-    for number, (sheet_name, filename, _) in enumerate(SHEETS, 1):
+    for number, (sheet_name, filename, _) in enumerate(sheets, 1):
         sheet = workbook.create_sheet(sheet_name)
         rows = rows_by_filename[filename]
         columns = columns_by_filename[filename]
         _write_table_sheet(sheet, rows, columns, number)
+        if sheet_name == "Athlete Capability Matrix":
+            sheet.freeze_panes = "D2"
         if sheet_name == "Wilco vs Field by Discipline" and rows:
-            _add_comparison_chart(sheet, columns, len(rows))
+            _add_comparison_chart(
+                sheet, columns, min(len(rows), EXCEL_MAX_ROWS - 1)
+            )
             chart_included = True
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -1158,6 +1556,7 @@ def _write_table_sheet(
     columns: tuple[str, ...], number: int,
 ) -> None:
     sheet.sheet_view.showGridLines = False
+    visible_rows = rows[:EXCEL_MAX_ROWS - 1]
     sheet.append([column.replace("_", " ").title() for column in columns])
     for cell in sheet[1]:
         cell.fill = HEADER_FILL
@@ -1165,12 +1564,12 @@ def _write_table_sheet(
         cell.alignment = Alignment(
             horizontal="center", vertical="center", wrap_text=True
         )
-    for row in rows:
+    for row in visible_rows:
         sheet.append([_workbook_value(column, row.get(column, ""))
                       for column in columns])
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = sheet.dimensions
-    if rows:
+    if visible_rows:
         table = Table(displayName=f"AnalysisTable{number}", ref=sheet.dimensions)
         table.tableStyleInfo = TableStyleInfo(
             name="TableStyleMedium2", showRowStripes=True,
@@ -1180,6 +1579,14 @@ def _write_table_sheet(
     else:
         sheet["A2"] = "No rows are currently available for this view."
         sheet["A2"].font = Font(italic=True, color="666666")
+    if len(rows) > len(visible_rows):
+        note_row = sheet.max_row + 2
+        sheet.cell(note_row, 1, (
+            f"Excel row limit reached. This sheet shows {len(visible_rows):,} "
+            f"of {len(rows):,} source rows; the complete table is available "
+            "as CSV under output/analysis/tables/."
+        ))
+        sheet.cell(note_row, 1).font = Font(italic=True, color="9C6500")
     for column_number, column in enumerate(columns, 1):
         letter = get_column_letter(column_number)
         values = [sheet.cell(row, column_number).value
@@ -1208,8 +1615,8 @@ def _add_comparison_chart(
     sheet: Any, columns: tuple[str, ...], row_count: int
 ) -> None:
     category_col = columns.index("discipline") + 1
-    wilco_col = columns.index("wilco_avg") + 1
-    field_col = columns.index("field_avg") + 1
+    wilco_col = columns.index("Wilco Avg") + 1
+    field_col = columns.index("Field Avg") + 1
     chart = BarChart()
     chart.type = "bar"
     chart.style = 10
@@ -1349,7 +1756,8 @@ def _workbook_value(column: str, value: Any) -> Any:
                       "entry_count", "number_of_matches",
                       "scored_matches_count", "string_count",
                       "wilco_entries", "field_entries", "affected_rows",
-                      "percentile"}
+                      "percentile", "Wilco Entries", "Field Entries",
+                      "teams_count", "athletes_count", "entries_count"}
         or " Avg String" in column or " Fastest String" in column
         or " Avg Stage" in column or " Fastest Stage" in column
     ):

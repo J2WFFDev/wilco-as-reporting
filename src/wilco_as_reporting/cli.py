@@ -11,6 +11,7 @@ from typing import Sequence
 from wilco_as_reporting.api.sasp_client import SaspApiError, SaspClient
 from wilco_as_reporting.analysis_workbook import (
     AnalysisWorkbookError,
+    VIEW_SETS,
     build_analysis_workbook,
 )
 from wilco_as_reporting.batch_refresh import (
@@ -488,6 +489,15 @@ def build_analysis_workbook_parser() -> argparse.ArgumentParser:
     parser.add_argument("--nationals-readiness-dir", type=Path)
     parser.add_argument("--past-seasons", default=2, type=int)
     parser.add_argument("--workbook-name")
+    parser.add_argument(
+        "--view-set",
+        choices=VIEW_SETS,
+        default="historical-prep",
+        help=(
+            "Workbook product to build. Use 'all' to build historical prep, "
+            "Wilco match, and staff match workbooks."
+        ),
+    )
     parser.add_argument(
         "--include-all-teams",
         action=argparse.BooleanOptionalAction,
@@ -1178,6 +1188,7 @@ def run_analysis_workbook(arguments: Sequence[str]) -> int:
             workbook_name=args.workbook_name,
             include_all_teams=args.include_all_teams,
             include_validation=args.include_validation,
+            view_set=args.view_set,
         )
     except (
         AnalysisWorkbookError,
@@ -1189,10 +1200,14 @@ def run_analysis_workbook(arguments: Sequence[str]) -> int:
     print(f"selected match: {result.selected_match_id}")
     print(f"selected match name: {result.selected_match_name}")
     print(f"selected match has no scores: {result.no_score_selected_match}")
-    for filename, row_count in result.row_counts.items():
-        print(f"{filename}: {row_count} rows")
-    print(f"chart included: {result.chart_included}")
-    print(f"workbook: {result.workbook_path}")
+    for view, row_counts in result.row_counts.items():
+        print(f"view-set: {view}")
+        for filename, row_count in row_counts.items():
+            print(f"{filename}: {row_count} rows")
+        print(f"chart included: {result.chart_included.get(view, False)}")
+        print(f"workbook: {result.workbook_paths[view]}")
+    for note in result.excel_row_limit_notes:
+        print(f"excel row-limit note: {note}")
     print(f"analysis tables: {result.tables_dir}")
     return 0
 

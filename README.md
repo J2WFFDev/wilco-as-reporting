@@ -53,7 +53,9 @@ output/nationals_packet/wilco_671_nationals_coach_packet.xlsx
 
 Supporting workbooks include:
 
-- `output/analysis/wilco_analysis_workbook.xlsx`
+- `output/analysis/historical_prep/wilco_historical_records_prep.xlsx`
+- `output/analysis/wilco_match/wilco_match_management_<match_id>.xlsx`
+- `output/analysis/staff_match/staff_match_review_<match_id>.xlsx`
 - `output/nationals_readiness/wilco_671_nationals_readiness.xlsx`
 - `output/records/wilco_records_report.xlsx`
 - `output/history/wilco_history_insights.xlsx`
@@ -96,8 +98,8 @@ intentionally ignored by Git and must not be committed.
 - `records-build`: create Wilco records and personal-record tables.
 - `nationals-readiness`: build the private Match 671 readiness brief.
 - `nationals-packet`: build the concise Nationals coach meeting packet.
-- `analysis-workbook`: consolidate historical, selected-match, field,
-  capability, validation, and records views into one workbook.
+- `analysis-workbook`: build focused historical prep, Wilco match-management,
+  or staff match-review workbooks from local analysis tables.
 
 ## Configuration
 
