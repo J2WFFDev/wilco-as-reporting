@@ -68,6 +68,17 @@ HISTORICAL_PREP_SHEETS = (
         ),
     ),
     (
+        "Competitive Analysis",
+        "competitive_analysis.csv",
+        (
+            "Athlete Name", "Athlete ID", "Team", "Gender", "Division",
+            "Class", "Discipline", "Number Of Matches", "Best Score",
+            "Match With Best Score", "Best Score Date", "Most Recent Score",
+            "Most Recent Match", "Most Recent Date", "Avg Score",
+            "Median Score", "Data Match Method", "Competitive Note",
+        ),
+    ),
+    (
         "Records and PRs",
         "records_and_prs.csv",
         (
@@ -232,6 +243,7 @@ SECONDS_COLUMNS = {
     "improvement_seconds", "previous_record_or_pr",
     "Wilco Avg", "Field Avg", "Wilco Best", "Field Best", "Top Team Avg",
     "Avg Gap To Field", "Wilco Gap To Field",
+    "Best Score", "Most Recent Score", "Avg Score", "Median Score",
 }
 
 
@@ -252,6 +264,11 @@ class AnalysisWorkbookResult:
     chart_included: dict[str, bool]
     no_score_selected_match: bool
     excel_row_limit_notes: tuple[str, ...]
+    competitor_source: str
+    competitors_checked: int
+    matched_competitors: int
+    unmatched_competitors: int
+    historical_score_rows_scanned: int
 
 
 def build_analysis_workbook(
@@ -267,6 +284,7 @@ def build_analysis_workbook(
     include_all_teams: bool = True,
     include_validation: bool = True,
     view_set: str = "historical-prep",
+    competitor_list_file: Path | str | None = None,
 ) -> AnalysisWorkbookResult:
     """Build the analysis tables and workbook without making API calls."""
     if view_set not in VIEW_SETS:
@@ -332,12 +350,24 @@ def build_analysis_workbook(
         _read_optional(records / "personal_records.csv"),
     )
     all_scores = _load_all_scores(root, scoped_ids, aliases)
+    all_local_scores = _load_all_local_match_scores(root, source_by_id, aliases)
     stage_values = _stage_value_rows(
         root, scoped_ids, source_lookup, profile, aliases,
         scoped_participation,
     )
     capability_columns, capability = _capability_rows(stage_values)
     field_comparison = _field_comparison_rows(all_scores, profile)
+    competitor_source, competitors = _competitor_set(
+        selected_scores=selected_scores,
+        competitor_list_file=Path(competitor_list_file)
+        if competitor_list_file else None,
+    )
+    competitive_analysis = _competitive_analysis_rows(
+        competitors, all_local_scores
+    )
+    competitive_stats = _competitive_stats(
+        competitors, competitive_analysis, all_local_scores
+    )
     match_results = _selected_match_rows(
         selected_id, selected_name, selected_date, selected_scores,
         profile, ranking_index,
@@ -394,6 +424,24 @@ def build_analysis_workbook(
             ("csv_full_table", "all_historical_match_scores_full.csv",
              len(all_scores),
              "Full all-team historical match scores are written to CSV."),
+            ("competitive_analysis", "competitors_checked",
+             competitive_stats["competitors_checked"],
+             "Competitive Analysis competitors checked."),
+            ("competitive_analysis", "matched_competitors",
+             competitive_stats["matched_competitors"],
+             "Competitors matched to at least one local historical score."),
+            ("competitive_analysis", "unmatched_competitors",
+             competitive_stats["unmatched_competitors"],
+             "Competitors with no matching local historical scores."),
+            ("competitive_analysis", "local_historical_score_rows_scanned",
+             competitive_stats["historical_score_rows_scanned"],
+             "Competitive Analysis scanned all local processed match score rows."),
+            ("competitive_analysis", "competitor_source_used",
+             competitive_stats["competitors_checked"],
+             competitor_source),
+            ("competitive_analysis", "selected_match_used",
+             selected_id,
+             f"Selected match {selected_id}: {selected_name}."),
         ],
     )
     wilco_match_quality = _with_quality_context(
@@ -414,10 +462,11 @@ def build_analysis_workbook(
         "athlete_performance_by_discipline.csv": athlete_performance,
         "athlete_capability_matrix.csv": capability,
         "athlete_discipline_stage_values.csv": stage_values,
-        "all_historical_match_scores_full.csv": all_scores,
+        "all_historical_match_scores_full.csv": all_local_scores,
         "wilco_vs_field_by_discipline.csv": _historical_field_rows(
             field_comparison
         ),
+        "competitive_analysis.csv": competitive_analysis,
         "wilco_match_results.csv": _project_rows(
             match_results, _columns_for("wilco_match_results.csv"),
         ),
@@ -470,6 +519,8 @@ def build_analysis_workbook(
         "source_matches_count": len(scoped_sources),
         "wilco_score_history_rows": len(match_history),
         "all_historical_score_rows": len(all_scores),
+        "all_local_score_rows_scanned": len(all_local_scores),
+        "competitive_analysis_rows": len(competitive_analysis),
         "selected_match_score_rows": len(selected_scores),
         "selected_match_validation_rows": len(validation),
         "long_stage_value_rows": len(stage_values),
@@ -528,6 +579,13 @@ def build_analysis_workbook(
         chart_included=chart_included,
         no_score_selected_match=no_score,
         excel_row_limit_notes=tuple(dict.fromkeys(row_limit_notes)),
+        competitor_source=competitor_source,
+        competitors_checked=competitive_stats["competitors_checked"],
+        matched_competitors=competitive_stats["matched_competitors"],
+        unmatched_competitors=competitive_stats["unmatched_competitors"],
+        historical_score_rows_scanned=competitive_stats[
+            "historical_score_rows_scanned"
+        ],
     )
 
 
@@ -637,6 +695,242 @@ def _row_limit_notes(
                 f"output/analysis/tables/{filename}."
             )
     return notes
+
+
+def _competitor_set(
+    *,
+    selected_scores: list[dict[str, Any]],
+    competitor_list_file: Path | None,
+) -> tuple[str, list[dict[str, Any]]]:
+    if competitor_list_file:
+        rows = _read_required(competitor_list_file)
+        competitors = []
+        for row in rows:
+            athlete_name = (
+                row.get("athlete_name") or row.get("name") or ""
+            ).strip()
+            athlete_id = (
+                row.get("athlete_id") or row.get("ath_id") or ""
+            ).strip()
+            if not athlete_name or athlete_id == PLACEHOLDER_ID:
+                continue
+            competitors.append({
+                "athlete_name": athlete_name,
+                "athlete_id": athlete_id,
+                "team_name": (row.get("team_name") or row.get("team") or "")
+                .strip(),
+                "gender": row.get("gender", "").strip(),
+                "class": row.get("class", "").strip(),
+                "division": row.get("division", "").strip(),
+                "discipline": row.get("discipline", "").strip(),
+            })
+        return (
+            f"competitor-list-file: {competitor_list_file}",
+            _dedupe_competitors(competitors),
+        )
+
+    competitors = []
+    for row in selected_scores:
+        if _is_placeholder(row):
+            continue
+        competitors.append({
+            "athlete_name": row.get("athlete_name", "").strip(),
+            "athlete_id": row.get("athlete_id", "").strip(),
+            "team_name": row.get("team_name", "").strip(),
+            "gender": row.get("gender", "").strip(),
+            "class": row.get("class", "").strip(),
+            "division": _division(row.get("class", "")),
+            "discipline": row.get("discipline", "").strip(),
+        })
+    return ("selected match entries", _dedupe_competitors(competitors))
+
+
+def _dedupe_competitors(
+    competitors: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    seen = set()
+    results = []
+    for row in competitors:
+        identity = row.get("athlete_id") or _normalized_name(
+            row.get("athlete_name", "")
+        )
+        key = (identity, row.get("discipline", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(row)
+    return results
+
+
+def _load_all_local_match_scores(
+    root: Path,
+    sources: dict[str, dict[str, str]],
+    aliases: tuple[Any, ...],
+) -> list[dict[str, Any]]:
+    results = []
+    for path in sorted(root.rglob("tables/match_scores.csv")):
+        match_id = path.parent.parent.name
+        if not match_id.isdigit():
+            continue
+        source = sources.get(match_id, {})
+        rows = apply_athlete_aliases(_read_optional(path), aliases)
+        for row in rows:
+            if _is_placeholder(row):
+                continue
+            score = _number(row.get("match_score_seconds"))
+            if score is None:
+                continue
+            results.append({
+                "match_id": row.get("match_id") or match_id,
+                "match_name": row.get("match_name")
+                or source.get("match_name", ""),
+                "match_date": source.get("match_date", ""),
+                "discipline": row.get("discipline", "").strip(),
+                "athlete_id": row.get("athlete_id", "").strip(),
+                "athlete_name": row.get("athlete_name", "").strip(),
+                "team_name": row.get("team_name", "").strip(),
+                "class": row.get("class", "").strip(),
+                "gender": row.get("gender", "").strip(),
+                "match_score_seconds": _display(score),
+                "dnf_flag": row.get("dnf_flag", ""),
+                "dq_flag": row.get("dq_flag", ""),
+                "_score": score,
+                "_name_key": _normalized_name(row.get("athlete_name", "")),
+            })
+    return results
+
+
+def _competitive_analysis_rows(
+    competitors: list[dict[str, Any]],
+    scores: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    by_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    by_name: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in scores:
+        if row.get("athlete_id"):
+            by_id[row["athlete_id"]].append(row)
+        if row.get("_name_key"):
+            by_name[row["_name_key"]].append(row)
+
+    results = []
+    for competitor in competitors:
+        athlete_id = competitor.get("athlete_id", "")
+        name_key = _normalized_name(competitor.get("athlete_name", ""))
+        if athlete_id and athlete_id in by_id:
+            matched = by_id[athlete_id]
+            method = "athlete_id"
+        elif name_key and name_key in by_name:
+            matched = by_name[name_key]
+            method = "normalized_name"
+        else:
+            matched = []
+            method = "unmatched"
+
+        requested_discipline = competitor.get("discipline", "")
+        disciplines = (
+            [requested_discipline] if requested_discipline
+            else sorted({row.get("discipline", "") for row in matched
+                         if row.get("discipline")})
+        )
+        if not disciplines:
+            disciplines = [requested_discipline]
+
+        for discipline in disciplines:
+            discipline_rows = [
+                row for row in matched
+                if not discipline or row.get("discipline") == discipline
+            ]
+            results.append(_competitive_row(
+                competitor, discipline, discipline_rows, method, bool(matched)
+            ))
+    return sorted(results, key=lambda row: (
+        row["Discipline"], row["Athlete Name"], row["Team"]
+    ))
+
+
+def _competitive_row(
+    competitor: dict[str, Any],
+    discipline: str,
+    rows: list[dict[str, Any]],
+    method: str,
+    matched_any: bool,
+) -> dict[str, Any]:
+    numeric_rows = [
+        row for row in rows if _number(row.get("match_score_seconds")) is not None
+    ]
+    values = [_number(row["match_score_seconds"]) for row in numeric_rows]
+    values = [value for value in values if value is not None]
+    best = min(
+        numeric_rows,
+        key=lambda row: _number(row.get("match_score_seconds")) or 999999,
+        default={},
+    )
+    most_recent = max(
+        numeric_rows,
+        key=lambda row: (
+            row.get("match_date", ""), _integer(row.get("match_id"))
+        ),
+        default={},
+    )
+    if values:
+        note = "Historical scores found."
+    elif matched_any and discipline:
+        note = "No historical score found for this discipline"
+    else:
+        note = "No matching historical scores found"
+    return {
+        "Athlete Name": competitor.get("athlete_name", ""),
+        "Athlete ID": competitor.get("athlete_id", ""),
+        "Team": competitor.get("team_name", ""),
+        "Gender": competitor.get("gender", ""),
+        "Division": competitor.get("division", "")
+        or _division(competitor.get("class", "")),
+        "Class": competitor.get("class", ""),
+        "Discipline": discipline,
+        "Number Of Matches": len({
+            row.get("match_id", "") for row in numeric_rows
+        }),
+        "Best Score": _display(min(values) if values else None),
+        "Match With Best Score": best.get("match_name", ""),
+        "Best Score Date": best.get("match_date", ""),
+        "Most Recent Score": _display(
+            _number(most_recent.get("match_score_seconds"))
+        ),
+        "Most Recent Match": most_recent.get("match_name", ""),
+        "Most Recent Date": most_recent.get("match_date", ""),
+        "Avg Score": _display(statistics.mean(values) if values else None),
+        "Median Score": _display(statistics.median(values) if values else None),
+        "Data Match Method": method if values or matched_any else "unmatched",
+        "Competitive Note": note,
+    }
+
+
+def _competitive_stats(
+    competitors: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
+    scores: list[dict[str, Any]],
+) -> dict[str, int]:
+    matched_keys = {
+        (
+            row.get("Athlete ID")
+            or _normalized_name(row.get("Athlete Name", ""))
+        )
+        for row in rows
+        if row.get("Data Match Method") != "unmatched"
+    }
+    checked_keys = {
+        (
+            row.get("athlete_id")
+            or _normalized_name(row.get("athlete_name", ""))
+        )
+        for row in competitors
+    }
+    return {
+        "competitors_checked": len(checked_keys),
+        "matched_competitors": len(matched_keys),
+        "unmatched_competitors": len(checked_keys - matched_keys),
+        "historical_score_rows_scanned": len(scores),
+    }
 
 
 def _match_history_rows(
@@ -1557,8 +1851,26 @@ def _write_table_sheet(
 ) -> None:
     sheet.sheet_view.showGridLines = False
     visible_rows = rows[:EXCEL_MAX_ROWS - 1]
+    header_row = 1
+    if sheet.title == "Competitive Analysis":
+        sheet["A1"] = "Competitive Analysis"
+        sheet["A1"].font = Font(size=18, bold=True, color="1F4E78")
+        sheet["A2"] = (
+            "Best historical match score by discipline for selected match "
+            "competitors."
+        )
+        sheet["A2"].font = Font(italic=True, color="666666")
+        sheet.merge_cells(
+            start_row=1, start_column=1, end_row=1,
+            end_column=max(len(columns), 1)
+        )
+        sheet.merge_cells(
+            start_row=2, start_column=1, end_row=2,
+            end_column=max(len(columns), 1)
+        )
+        header_row = 3
     sheet.append([column.replace("_", " ").title() for column in columns])
-    for cell in sheet[1]:
+    for cell in sheet[header_row]:
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
         cell.alignment = Alignment(
@@ -1567,18 +1879,22 @@ def _write_table_sheet(
     for row in visible_rows:
         sheet.append([_workbook_value(column, row.get(column, ""))
                       for column in columns])
-    sheet.freeze_panes = "A2"
-    sheet.auto_filter.ref = sheet.dimensions
+    sheet.freeze_panes = "A4" if header_row == 3 else "A2"
+    last_col = get_column_letter(max(len(columns), 1))
+    table_end_row = header_row + max(len(visible_rows), 1)
+    table_ref = f"A{header_row}:{last_col}{table_end_row}"
+    sheet.auto_filter.ref = table_ref
     if visible_rows:
-        table = Table(displayName=f"AnalysisTable{number}", ref=sheet.dimensions)
+        table = Table(displayName=f"AnalysisTable{number}", ref=table_ref)
         table.tableStyleInfo = TableStyleInfo(
             name="TableStyleMedium2", showRowStripes=True,
             showColumnStripes=False,
         )
         sheet.add_table(table)
     else:
-        sheet["A2"] = "No rows are currently available for this view."
-        sheet["A2"].font = Font(italic=True, color="666666")
+        note_cell = sheet.cell(header_row + 1, 1)
+        note_cell.value = "No rows are currently available for this view."
+        note_cell.font = Font(italic=True, color="666666")
     if len(rows) > len(visible_rows):
         note_row = sheet.max_row + 2
         sheet.cell(note_row, 1, (
@@ -1590,7 +1906,7 @@ def _write_table_sheet(
     for column_number, column in enumerate(columns, 1):
         letter = get_column_letter(column_number)
         values = [sheet.cell(row, column_number).value
-                  for row in range(2, sheet.max_row + 1)]
+                  for row in range(header_row + 1, sheet.max_row + 1)]
         sheet.column_dimensions[letter].width = _column_width(column, values)
         if column in SECONDS_COLUMNS or any(
             marker in column for marker in (
@@ -1600,7 +1916,12 @@ def _write_table_sheet(
         ):
             for cell in sheet[letter][1:]:
                 if isinstance(cell.value, (int, float)):
-                    cell.number_format = "0.000"
+                    cell.number_format = (
+                        "0.00" if column in {
+                            "Best Score", "Most Recent Score", "Avg Score",
+                            "Median Score",
+                        } else "0.000"
+                    )
         if column == "percentile":
             for cell in sheet[letter][1:]:
                 if isinstance(cell.value, (int, float)):
@@ -1706,6 +2027,10 @@ def _first(rows: list[dict[str, Any]], column: str) -> str:
                  if row.get(column)), "")
 
 
+def _normalized_name(value: str | None) -> str:
+    return " ".join((value or "").casefold().split())
+
+
 def _confidence(count: int) -> str:
     return "high" if count >= 4 else "medium" if count >= 2 else "low"
 
@@ -1757,7 +2082,8 @@ def _workbook_value(column: str, value: Any) -> Any:
                       "scored_matches_count", "string_count",
                       "wilco_entries", "field_entries", "affected_rows",
                       "percentile", "Wilco Entries", "Field Entries",
-                      "teams_count", "athletes_count", "entries_count"}
+                      "teams_count", "athletes_count", "entries_count",
+                      "Number Of Matches"}
         or " Avg String" in column or " Fastest String" in column
         or " Avg Stage" in column or " Fastest Stage" in column
     ):

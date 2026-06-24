@@ -490,6 +490,15 @@ def build_analysis_workbook_parser() -> argparse.ArgumentParser:
     parser.add_argument("--past-seasons", default=2, type=int)
     parser.add_argument("--workbook-name")
     parser.add_argument(
+        "--competitor-list-file",
+        type=Path,
+        help=(
+            "Optional CSV of selected competitors for historical competitive "
+            "analysis. Accepts name/ath_id/team/gender or athlete_name/"
+            "athlete_id/team_name/gender columns."
+        ),
+    )
+    parser.add_argument(
         "--view-set",
         choices=VIEW_SETS,
         default="historical-prep",
@@ -1189,6 +1198,7 @@ def run_analysis_workbook(arguments: Sequence[str]) -> int:
             include_all_teams=args.include_all_teams,
             include_validation=args.include_validation,
             view_set=args.view_set,
+            competitor_list_file=args.competitor_list_file,
         )
     except (
         AnalysisWorkbookError,
@@ -1200,6 +1210,14 @@ def run_analysis_workbook(arguments: Sequence[str]) -> int:
     print(f"selected match: {result.selected_match_id}")
     print(f"selected match name: {result.selected_match_name}")
     print(f"selected match has no scores: {result.no_score_selected_match}")
+    print(f"competitor source: {result.competitor_source}")
+    print(f"competitors checked: {result.competitors_checked}")
+    print(f"matched competitors: {result.matched_competitors}")
+    print(f"unmatched competitors: {result.unmatched_competitors}")
+    print(
+        "historical score rows scanned: "
+        f"{result.historical_score_rows_scanned}"
+    )
     for view, row_counts in result.row_counts.items():
         print(f"view-set: {view}")
         for filename, row_count in row_counts.items():

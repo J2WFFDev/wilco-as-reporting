@@ -47,6 +47,21 @@ python -m wilco_as_reporting.cli analysis-workbook --team-key wilco --match-id 6
 `--view-set all` builds all three workbooks in one run. Matching source CSVs
 for visible workbook tabs are written under `output/analysis/tables/`.
 
+Historical prep also supports an optional competitor list for competitive field
+analysis:
+
+```powershell
+python -m wilco_as_reporting.cli analysis-workbook `
+  --team-key wilco `
+  --match-id 671 `
+  --output-dir output `
+  --view-set historical-prep `
+  --competitor-list-file input/special_athletes.csv
+```
+
+The optional CSV can use `name`, `ath_id`, `team`, and `gender` columns. The
+command also tolerates `athlete_name`, `athlete_id`, and `team_name`.
+
 ## Workbook 1: Historical records and match prep
 
 Path:
@@ -61,8 +76,9 @@ contains only Wilco-scoped historical and prep views:
 3. Athlete Perf by Discipline
 4. Athlete Capability Matrix
 5. Wilco vs Field by Discipline
-6. Records and PRs
-7. Data Quality Notes
+6. Competitive Analysis
+7. Records and PRs
+8. Data Quality Notes
 
 The historical workbook intentionally does not include Published SASP Rankings,
 selected-match results, match review, national staff validation, or the
@@ -70,6 +86,33 @@ long-format athlete discipline stage values sheet. Long-format stage values are
 written to CSV only at:
 
 `output/analysis/tables/athlete_discipline_stage_values.csv`
+
+### Competitive Analysis
+
+Competitive Analysis is the coach match-prep field view. For the selected
+match, it builds a competitor set and shows each competitor's best available
+historical match score by discipline, plus number of matches, most recent
+score, average, and median.
+
+If `--competitor-list-file` is supplied, that CSV is the competitor set. If it
+is not supplied, the command uses all selected-match entries from
+`output/<match_id>/tables/match_scores.csv`, including non-Wilco athletes when
+they are present locally. This is the default mode for Match 671 Nationals
+prep.
+
+The competitive scan is intentionally not limited to Wilco history tables. It
+recursively scans all local processed match-score files matching:
+
+`output/<match_id>/tables/match_scores.csv`
+
+Matching uses `athlete_id` first. If an athlete ID is missing, it falls back to
+normalized athlete name. Duplicate supplied competitors are deduped. If a
+competitor has no matching local historical scores, the row remains visible
+with `Data Match Method = unmatched` and a plain-English competitive note.
+
+The source CSV is:
+
+`output/analysis/tables/competitive_analysis.csv`
 
 ## Workbook 2: Wilco match management
 

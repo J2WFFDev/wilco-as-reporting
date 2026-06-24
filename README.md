@@ -99,7 +99,9 @@ intentionally ignored by Git and must not be committed.
 - `nationals-readiness`: build the private Match 671 readiness brief.
 - `nationals-packet`: build the concise Nationals coach meeting packet.
 - `analysis-workbook`: build focused historical prep, Wilco match-management,
-  or staff match-review workbooks from local analysis tables.
+  or staff match-review workbooks from local analysis tables. Historical prep
+  includes Competitive Analysis for selected-match competitors or an optional
+  `--competitor-list-file`.
 
 ## Configuration
 
