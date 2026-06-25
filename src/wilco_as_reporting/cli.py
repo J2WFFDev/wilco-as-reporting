@@ -56,6 +56,10 @@ from wilco_as_reporting.reports import (
     build_match_report,
     build_team_report,
 )
+from wilco_as_reporting.ryatt_competitive_analysis import (
+    RyattCompetitiveAnalysisError,
+    build_ryatt_competitive_analysis,
+)
 from wilco_as_reporting.team_profiles import (
     TeamProfileError,
     load_team_profile,
@@ -514,6 +518,28 @@ def build_analysis_workbook_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--include-validation",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    return parser
+
+
+def build_ryatt_competitive_analysis_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m wilco_as_reporting.cli ryatt-competitive-analysis",
+        description=(
+            "Build Ryatt West's local-only competitive scouting report."
+        ),
+    )
+    parser.add_argument("--output-dir", default=Path("output"), type=Path)
+    parser.add_argument("--target-athlete-id", default="76179")
+    parser.add_argument("--target-athlete-name", default="Ryatt West")
+    parser.add_argument("--gap-seconds", default=2.0, type=float)
+    parser.add_argument("--match-id", default=671, type=int)
+    parser.add_argument("--history-dir", type=Path)
+    parser.add_argument("--records-dir", type=Path)
+    parser.add_argument(
+        "--workbook",
         action=argparse.BooleanOptionalAction,
         default=True,
     )
@@ -1230,6 +1256,44 @@ def run_analysis_workbook(arguments: Sequence[str]) -> int:
     return 0
 
 
+def run_ryatt_competitive_analysis(arguments: Sequence[str]) -> int:
+    args = build_ryatt_competitive_analysis_parser().parse_args(arguments)
+    try:
+        result = build_ryatt_competitive_analysis(
+            output_root=args.output_dir,
+            target_athlete_id=args.target_athlete_id,
+            target_athlete_name=args.target_athlete_name,
+            gap_seconds=args.gap_seconds,
+            match_id=args.match_id,
+            history_dir=args.history_dir,
+            records_dir=args.records_dir,
+            workbook=args.workbook,
+        )
+    except (RyattCompetitiveAnalysisError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    print(f"target athlete: {result.target_athlete_name}")
+    print(f"target athlete id: {result.target_athlete_id}")
+    print(f"gap seconds: {result.gap_seconds}")
+    print(
+        "historical score rows scanned: "
+        f"{result.historical_score_rows_scanned}"
+    )
+    print(f"target disciplines found: {result.target_disciplines_found}")
+    print(f"comparison rows generated: {result.comparison_rows_generated}")
+    print(f"faster than Ryatt: {result.faster_than_ryatt_count}")
+    print(f"within gap slower: {result.within_gap_slower_count}")
+    print(f"non-Wilco rows included: {result.non_wilco_rows_included}")
+    print(f"analysis csv: {result.analysis_csv}")
+    print(f"summary csv: {result.summary_csv}")
+    print(f"discipline summary csv: {result.discipline_summary_csv}")
+    print(f"data quality csv: {result.data_quality_csv}")
+    if result.workbook_path:
+        print(f"workbook: {result.workbook_path}")
+    print(f"output: {result.output_dir}")
+    return 0
+
+
 def _parse_integer_list(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
@@ -1313,6 +1377,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_nationals_packet(command_arguments[1:])
     if command_arguments and command_arguments[0] == "analysis-workbook":
         return run_analysis_workbook(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "ryatt-competitive-analysis":
+        return run_ryatt_competitive_analysis(command_arguments[1:])
     return run_fetch(command_arguments)
 
 

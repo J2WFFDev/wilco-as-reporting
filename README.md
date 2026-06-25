@@ -102,6 +102,9 @@ intentionally ignored by Git and must not be committed.
   or staff match-review workbooks from local analysis tables. Historical prep
   includes Competitive Analysis for selected-match competitors or an optional
   `--competitor-list-file`.
+- `ryatt-competitive-analysis`: build a local-only scouting report for Ryatt
+  West against faster competitors and athletes within a configurable slower
+  gap.
 
 ## Configuration
 
@@ -131,6 +134,7 @@ inventory and workflow purpose of each tracked file group.
 - [Nationals readiness](docs/nationals-readiness.md)
 - [Nationals coach packet](docs/nationals-coach-packet.md)
 - [Wilco analysis workbook](docs/analysis-workbook.md)
+- [Ryatt competitive analysis](docs/ryatt-competitive-analysis.md)
 - [Repository layout](docs/repository-layout.md)
 - [Repository inventory](docs/repo-inventory.md)
 
